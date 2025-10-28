@@ -25,7 +25,7 @@
 //! let manager = FileManager::new();
 //! let selected = manager.interactive_select(&entries)?;
 //! let valid = manager.validate_entries(&selected);
-//! 
+//!
 //! if manager.confirm_deletion(&valid)? {
 //!     let (deleted, failed) = manager.delete_entries(&valid)?;
 //! }
@@ -77,7 +77,7 @@ use std::path::Path;
 ///     println!("Successfully deleted {} items", deleted.len());
 /// }
 /// ```
-pub struct FileManager;
+pub struct FileManager {
     theme: ColorfulTheme,
 }
 
@@ -195,9 +195,7 @@ impl FileManager {
     pub fn validate_entries(&self, entries: &[DirectoryEntry]) -> Vec<DirectoryEntry> {
         entries
             .iter()
-            .filter(|entry| {
-                entry.path.exists() && PlatformUtils::can_delete(&entry.path)
-            })
+            .filter(|entry| entry.path.exists() && PlatformUtils::can_delete(&entry.path))
             .cloned()
             .collect()
     }
@@ -206,9 +204,7 @@ impl FileManager {
     pub fn get_unwritable_entries(&self, entries: &[DirectoryEntry]) -> Vec<DirectoryEntry> {
         entries
             .iter()
-            .filter(|entry| {
-                entry.path.exists() && !PlatformUtils::can_delete(&entry.path)
-            })
+            .filter(|entry| entry.path.exists() && !PlatformUtils::can_delete(&entry.path))
             .cloned()
             .collect()
     }

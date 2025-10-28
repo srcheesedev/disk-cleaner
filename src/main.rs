@@ -64,14 +64,14 @@ Features:
 ")]
 struct Cli {
     /// Directory to analyze for disk usage
-    /// 
+    ///
     /// Specify the target directory to scan. If not provided, analyzes the current directory.
     /// The tool will recursively scan subdirectories up to the specified depth limit.
     #[arg(default_value = ".")]
     path: PathBuf,
 
     /// Maximum directory depth to analyze
-    /// 
+    ///
     /// Controls how deep the recursive directory scan goes. Depth 1 means only immediate
     /// children, depth 2 includes grandchildren, etc. Higher values provide more detail
     /// but take longer to process.
@@ -79,21 +79,21 @@ struct Cli {
     depth: usize,
 
     /// Minimum file/directory size threshold (in bytes)
-    /// 
+    ///
     /// Only show entries larger than this size. Useful for finding space hogs.
     /// Examples: 1048576 (1MB), 104857600 (100MB), 1073741824 (1GB)
     #[arg(short, long)]
     min_size: Option<u64>,
 
     /// Show only directories in results
-    /// 
+    ///
     /// Filter results to display directories only, hiding individual files.
     /// Cannot be used together with --files-only.
     #[arg(long)]
     dirs_only: bool,
 
     /// Show only files in results
-    /// 
+    ///
     /// Filter results to display files only, hiding directories.
     /// Cannot be used together with --dirs-only.
     #[arg(long)]
@@ -101,7 +101,7 @@ struct Cli {
 }
 
 /// Application entry point.
-/// 
+///
 /// Orchestrates the disk analysis workflow by:
 /// 1. Parsing command-line arguments
 /// 2. Initializing analysis and file management components  
@@ -111,11 +111,11 @@ struct Cli {
 /// 6. Reporting results and freed space
 ///
 /// # Returns
-/// 
+///
 /// `Ok(())` on successful completion, or an error if any step fails.
 ///
 /// # Errors
-/// 
+///
 /// Returns error if:
 /// - Target directory doesn't exist or isn't accessible
 /// - File system operations fail due to permissions
@@ -170,12 +170,13 @@ async fn main() -> Result<()> {
     // Validate entries still exist and check permissions
     let valid_selected = file_manager.validate_entries(&selected);
     let unwritable = file_manager.get_unwritable_entries(&selected);
-    
+
     if !unwritable.is_empty() {
         println!("\n⚠️  Warning: The following items cannot be deleted (permission denied):");
         for entry in &unwritable {
-            println!("  {} {}", 
-                if entry.is_directory { "📁" } else { "📄" }, 
+            println!(
+                "  {} {}",
+                if entry.is_directory { "📁" } else { "📄" },
                 entry.path.display()
             );
         }
@@ -188,7 +189,10 @@ async fn main() -> Result<()> {
             println!("⚠️  {} selected items no longer exist.", missing);
         }
         if !unwritable.is_empty() {
-            println!("⚠️  {} selected items cannot be deleted due to permissions.", unwritable.len());
+            println!(
+                "⚠️  {} selected items cannot be deleted due to permissions.",
+                unwritable.len()
+            );
         }
         println!("📊 Proceeding with {} valid items.", valid_selected.len());
     }

@@ -7,6 +7,10 @@ on:
   pull_request:
     branches: [ main ]
 
+permissions:
+  contents: write
+  pull-requests: read
+
 env:
   CARGO_TERM_COLOR: always
 
@@ -175,41 +179,41 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  update-changelog:
-    name: Update Changelog
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      with:
-        token: ${{ secrets.GITHUB_TOKEN }}
-        fetch-depth: 0
+  # update-changelog:
+  #   name: Update Changelog
+  #   runs-on: ubuntu-latest
+  #   if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+  #   
+  #   steps:
+  #   - name: Checkout code
+  #     uses: actions/checkout@v4
+  #     with:
+  #       token: ${{ secrets.GITHUB_TOKEN }}
+  #       fetch-depth: 0
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: '18'
+  #   - name: Setup Node.js
+  #     uses: actions/setup-node@v3
+  #     with:
+  #       node-version: '18'
 
-    - name: Install conventional-changelog
-      run: npm install -g conventional-changelog-cli
+  #   - name: Install conventional-changelog
+  #     run: npm install -g conventional-changelog-cli
 
-    - name: Update CHANGELOG.md
-      run: |
-        # Generate changelog
-        conventional-changelog -p angular -i CHANGELOG.md -s
-        
-        # Check if there are changes
-        if git diff --quiet CHANGELOG.md; then
-          echo "No changelog updates needed"
-          exit 0
-        fi
+  #   - name: Update CHANGELOG.md
+  #     run: |
+  #       # Generate changelog
+  #       conventional-changelog -p angular -i CHANGELOG.md -s
+  #       
+  #       # Check if there are changes
+  #       if git diff --quiet CHANGELOG.md; then
+  #         echo "No changelog updates needed"
+  #         exit 0
+  #       fi
 
-    - name: Commit changelog
-      run: |
-        git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
-        git add CHANGELOG.md
-        git commit -m "docs: update changelog [skip ci]" || exit 0
-        git push
+  #   - name: Commit changelog
+  #     run: |
+  #       git config --local user.email "action@github.com"
+  #       git config --local user.name "GitHub Action"
+  #       git add CHANGELOG.md
+  #       git commit -m "docs: update changelog [skip ci]" || exit 0
+  #       git push

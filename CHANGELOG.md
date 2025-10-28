@@ -57,5 +57,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Security policy for responsible vulnerability disclosure
 - MIT license for maximum compatibility
 
-[Unreleased]: https://github.com/YOUR_USERNAME/disk-cleaner/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/YOUR_USERNAME/disk-cleaner/releases/tag/v0.1.0
+[Unreleased]: https://github.com/srcheesedev/disk-cleaner/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/srcheesedev/disk-cleaner/releases/tag/v0.1.0

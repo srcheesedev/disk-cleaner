@@ -29,7 +29,7 @@ Please be respectful and professional in all interactions. We aim to create a we
 
 1. **Fork and clone the repository**:
    ```bash
-   git clone https://github.com/YOUR_USERNAME/disk-cleaner.git
+   git clone https://github.com/srcheesedev/disk-cleaner.git
    cd disk-cleaner
    ```
 

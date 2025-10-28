@@ -18,7 +18,8 @@ If you discover a security vulnerability in Disk Cleaner, please report it respo
 Instead, please:
 
 ### Contact
-- Email: [REPLACE_WITH_YOUR_EMAIL]
+
+- Email: srcheesedev@gmail.com
 - Subject: "Security Vulnerability - Disk Cleaner"
 
 ### Information to Include

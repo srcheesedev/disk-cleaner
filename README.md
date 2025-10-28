@@ -5,18 +5,18 @@ Interactive directory size analyzer and cleanup tool. A high-performance alterna
 [![Rust](https://img.shields.io/badge/rust-1.70+-orange.svg)](https://www.rust-lang.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Tests](https://img.shields.io/badge/tests-20%20passing-green.svg)](#testing)
-[![CI](https://github.com/YOUR_USERNAME/disk-cleaner/workflows/CI%2FCD%20Pipeline/badge.svg)](https://github.com/YOUR_USERNAME/disk-cleaner/actions)
+[![CI](https://github.com/srcheesedev/disk-cleaner/workflows/CI%2FCD%20Pipeline/badge.svg)](https://github.com/srcheesedev/disk-cleaner/actions)
 
 ## 🚀 Quick Start
 
 ```bash
 # Download latest release
-wget https://github.com/YOUR_USERNAME/disk-cleaner/releases/latest/download/disk-cleaner-x86_64-unknown-linux-gnu.tar.gz
+wget https://github.com/srcheesedev/disk-cleaner/releases/latest/download/disk-cleaner-x86_64-unknown-linux-gnu.tar.gz
 tar -xzf disk-cleaner-x86_64-unknown-linux-gnu.tar.gz
 ./install.sh
 
 # Or build from source
-git clone https://github.com/YOUR_USERNAME/disk-cleaner.git
+git clone https://github.com/srcheesedev/disk-cleaner.git
 cd disk-cleaner
 ./install.sh
 
@@ -53,8 +53,8 @@ disk-cleaner --help             # Show all options
 
 ### Option 1: Automatic Installation (Recommended)
 ```bash
-git clone https://github.com/YOUR_USERNAME/disk-cleaner-rs.git
-cd disk-cleaner-rs
+git clone https://github.com/srcheesedev/disk-cleaner.git
+cd disk-cleaner
 ./install.sh
 ```
 
@@ -65,8 +65,8 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 source ~/.cargo/env
 
 # Clone and build
-git clone https://github.com/YOUR_USERNAME/disk-cleaner-rs.git
-cd disk-cleaner-rs
+git clone https://github.com/srcheesedev/disk-cleaner.git
+cd disk-cleaner
 cargo build --release
 
 # Run
@@ -170,8 +170,8 @@ Contributions are welcome! Please feel free to submit issues and pull requests.
 
 ### Development Setup
 ```bash
-git clone https://github.com/YOUR_USERNAME/disk-cleaner-rs.git
-cd disk-cleaner-rs
+git clone https://github.com/srcheesedev/disk-cleaner.git
+cd disk-cleaner
 cargo build
 cargo test
 ```

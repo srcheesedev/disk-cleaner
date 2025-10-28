@@ -1,5 +1,6 @@
 mod analyzer;
 mod file_manager;
+mod platform;
 
 use anyhow::Result;
 use clap::Parser;
@@ -81,10 +82,30 @@ async fn main() -> Result<()> {
         return Ok(());
     }
 
-    // Validate entries still exist
+    // Validate entries still exist and check permissions
     let valid_selected = file_manager.validate_entries(&selected);
+    let unwritable = file_manager.get_unwritable_entries(&selected);
+    
+    if !unwritable.is_empty() {
+        println!("\n⚠️  Warning: The following items cannot be deleted (permission denied):");
+        for entry in &unwritable {
+            println!("  {} {}", 
+                if entry.is_directory { "📁" } else { "📄" }, 
+                entry.path.display()
+            );
+        }
+        println!("  You may need administrator/root privileges to delete these items.\n");
+    }
+
     if valid_selected.len() != selected.len() {
-        println!("⚠️  Some selected items no longer exist. Proceeding with valid items only.");
+        let missing = selected.len() - valid_selected.len() - unwritable.len();
+        if missing > 0 {
+            println!("⚠️  {} selected items no longer exist.", missing);
+        }
+        if !unwritable.is_empty() {
+            println!("⚠️  {} selected items cannot be deleted due to permissions.", unwritable.len());
+        }
+        println!("📊 Proceeding with {} valid items.", valid_selected.len());
     }
 
     if valid_selected.is_empty() {

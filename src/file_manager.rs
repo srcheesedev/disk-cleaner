@@ -1,7 +1,7 @@
 use crate::analyzer::DirectoryEntry;
+use crate::platform::PlatformUtils;
 use anyhow::Result;
 use dialoguer::{theme::ColorfulTheme, Confirm, MultiSelect};
-use std::fs;
 use std::path::Path;
 
 /// Handles user interaction for file selection and deletion
@@ -114,28 +114,29 @@ impl FileManager {
         Ok((deleted, failed))
     }
 
-    /// Delete a single file or directory
+    /// Delete a single file or directory with cross-platform support
     fn delete_single_entry<P: AsRef<Path>>(&self, path: P, is_directory: bool) -> Result<()> {
-        let path = path.as_ref();
-
-        if !path.exists() {
-            return Err(anyhow::anyhow!("Path does not exist"));
-        }
-
-        if is_directory {
-            fs::remove_dir_all(path)?;
-        } else {
-            fs::remove_file(path)?;
-        }
-
-        Ok(())
+        PlatformUtils::safe_delete(path, is_directory)
     }
 
-    /// Validate that all entries still exist before deletion
+    /// Validate that all entries still exist and can be deleted before deletion
     pub fn validate_entries(&self, entries: &[DirectoryEntry]) -> Vec<DirectoryEntry> {
         entries
             .iter()
-            .filter(|entry| entry.path.exists())
+            .filter(|entry| {
+                entry.path.exists() && PlatformUtils::can_delete(&entry.path)
+            })
+            .cloned()
+            .collect()
+    }
+
+    /// Get entries that exist but cannot be deleted (for warning the user)
+    pub fn get_unwritable_entries(&self, entries: &[DirectoryEntry]) -> Vec<DirectoryEntry> {
+        entries
+            .iter()
+            .filter(|entry| {
+                entry.path.exists() && !PlatformUtils::can_delete(&entry.path)
+            })
             .cloned()
             .collect()
     }
@@ -178,6 +179,7 @@ impl Default for FileManager {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
     use std::fs::File;
     use std::io::Write;
     use std::path::PathBuf;

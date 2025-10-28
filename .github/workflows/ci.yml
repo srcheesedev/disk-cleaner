@@ -35,7 +35,7 @@ jobs:
         components: rustfmt, clippy
 
     - name: Cache dependencies
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: |
           ~/.cargo/registry
@@ -82,15 +82,19 @@ jobs:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             suffix: ""
+            platform: "linux"
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             suffix: ".exe"
+            platform: "windows"
           - os: macos-latest
             target: x86_64-apple-darwin
             suffix: ""
+            platform: "macos-intel"
           - os: macos-latest
             target: aarch64-apple-darwin
             suffix: ""
+            platform: "macos-arm64"
 
     steps:
     - name: Checkout code
@@ -102,7 +106,7 @@ jobs:
         targets: ${{ matrix.target }}
 
     - name: Cache dependencies
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: |
           ~/.cargo/registry
@@ -120,20 +124,20 @@ jobs:
         if [ "${{ matrix.os }}" = "windows-latest" ]; then
           cp target/${{ matrix.target }}/release/disk-cleaner-rs${{ matrix.suffix }} dist/
           cp README.md LICENSE dist/
-          cd dist && 7z a ../disk-cleaner-${{ matrix.target }}.zip *
+          cd dist && 7z a ../disk-cleaner-${{ matrix.platform }}.zip *
         else
           cp target/${{ matrix.target }}/release/disk-cleaner-rs${{ matrix.suffix }} dist/
           cp README.md LICENSE install.sh dist/
-          cd dist && tar -czf ../disk-cleaner-${{ matrix.target }}.tar.gz *
+          cd dist && tar -czf ../disk-cleaner-${{ matrix.platform }}.tar.gz *
         fi
 
     - name: Upload artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
-        name: disk-cleaner-${{ matrix.target }}
+        name: disk-cleaner-${{ matrix.platform }}
         path: |
-          disk-cleaner-${{ matrix.target }}.tar.gz
-          disk-cleaner-${{ matrix.target }}.zip
+          disk-cleaner-${{ matrix.platform }}.tar.gz
+          disk-cleaner-${{ matrix.platform }}.zip
         if-no-files-found: ignore
 
   release:
@@ -149,7 +153,16 @@ jobs:
         fetch-depth: 0
 
     - name: Download all artifacts
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts
+
+    - name: Prepare release files
+      run: |
+        mkdir -p release-files
+        find artifacts -name "*.tar.gz" -exec cp {} release-files/ \;
+        find artifacts -name "*.zip" -exec cp {} release-files/ \;
+        ls -la release-files/
 
     - name: Generate changelog
       id: changelog
@@ -174,8 +187,7 @@ jobs:
         name: Release ${{ steps.changelog.outputs.version }}
         body_path: release_notes.md
         files: |
-          disk-cleaner-*/disk-cleaner-*.tar.gz
-          disk-cleaner-*/disk-cleaner-*.zip
+          release-files/*
         draft: false
         prerelease: ${{ contains(github.ref, '-') }}
       env:
@@ -194,9 +206,9 @@ jobs:
   #       fetch-depth: 0
 
   #   - name: Setup Node.js
-  #     uses: actions/setup-node@v3
+  #     uses: actions/setup-node@v4
   #     with:
-  #       node-version: '18'
+  #       node-version: '20'
 
   #   - name: Install conventional-changelog
   #     run: npm install -g conventional-changelog-cli
@@ -234,9 +246,9 @@ jobs:
         token: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Setup Node.js
-      uses: actions/setup-node@v3
+      uses: actions/setup-node@v4
       with:
-        node-version: '18'
+        node-version: '20'
 
     - name: Install dependencies
       run: |

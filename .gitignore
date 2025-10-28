@@ -78,6 +78,8 @@ $RECYCLE.BIN/
 /tmp/
 
 # Runtime logs
+logs/
+logs/*
 *.log
 
 # Personal notes (if any)

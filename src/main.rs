@@ -45,7 +45,7 @@ async fn main() -> Result<()> {
     // Display header
     println!("🔍 Disk Cleaner - Interactive Directory Analysis");
     println!("📁 Analyzing: {}", cli.path.display());
-    
+
     if cli.depth > 1 {
         println!("📊 Max depth: {}", cli.depth);
     }
@@ -95,7 +95,7 @@ async fn main() -> Result<()> {
     // Confirm deletion
     if file_manager.confirm_deletion(&valid_selected)? {
         println!("\n🗑️  Proceeding with deletion...");
-        
+
         let (deleted, failed) = file_manager.delete_entries(&valid_selected)?;
 
         // Display results
@@ -114,11 +114,16 @@ async fn main() -> Result<()> {
         }
 
         // Calculate freed space
-        let freed_bytes: u64 = valid_selected.iter()
-            .filter(|entry| deleted.iter().any(|d| d.contains(&entry.path.to_string_lossy().to_string())))
+        let freed_bytes: u64 = valid_selected
+            .iter()
+            .filter(|entry| {
+                deleted
+                    .iter()
+                    .any(|d| d.contains(&entry.path.to_string_lossy().to_string()))
+            })
             .map(|entry| entry.size_bytes)
             .sum();
-        
+
         if freed_bytes > 0 {
             let freed_human = humansize::format_size(freed_bytes, humansize::DECIMAL);
             println!("\n💾 Total space freed: {}", freed_human);
@@ -135,11 +140,11 @@ async fn main() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_cli_parsing() {
         // Test default values
-        let cli = Cli::parse_from(&["disk-cleaner"]);
+        let cli = Cli::parse_from(["disk-cleaner"]);
         assert_eq!(cli.path, PathBuf::from("."));
         assert_eq!(cli.depth, 1);
         assert_eq!(cli.min_size, None);
@@ -149,14 +154,16 @@ mod tests {
 
     #[test]
     fn test_cli_with_arguments() {
-        let cli = Cli::parse_from(&[
-            "disk-cleaner", 
-            "/tmp", 
-            "--depth", "2", 
-            "--min-size", "1000",
-            "--dirs-only"
+        let cli = Cli::parse_from([
+            "disk-cleaner",
+            "/tmp",
+            "--depth",
+            "2",
+            "--min-size",
+            "1000",
+            "--dirs-only",
         ]);
-        
+
         assert_eq!(cli.path, PathBuf::from("/tmp"));
         assert_eq!(cli.depth, 2);
         assert_eq!(cli.min_size, Some(1000));
@@ -167,12 +174,8 @@ mod tests {
     #[test]
     fn test_cli_conflicting_flags() {
         // This should work - last flag wins typically
-        let cli = Cli::parse_from(&[
-            "disk-cleaner",
-            "--dirs-only",
-            "--files-only"
-        ]);
-        
+        let cli = Cli::parse_from(["disk-cleaner", "--dirs-only", "--files-only"]);
+
         // Both flags can be set, but logic in main() should handle conflicts
         assert!(cli.dirs_only);
         assert!(cli.files_only);

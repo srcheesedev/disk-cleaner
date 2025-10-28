@@ -1,9 +1,9 @@
 use anyhow::Result;
-use humansize::{DECIMAL, format_size};
-use std::path::{Path, PathBuf};
+use humansize::{format_size, DECIMAL};
 use std::fs;
-use walkdir::WalkDir;
+use std::path::{Path, PathBuf};
 use tokio::task;
+use walkdir::WalkDir;
 
 /// Represents a directory or file entry with size information
 #[derive(Debug, Clone, PartialEq)]
@@ -26,8 +26,10 @@ impl DirectoryEntry {
     }
 }
 
-/// Handles directory size analysis with async support
+/// Main analyzer struct for disk operations
+#[derive(Debug)]
 pub struct DiskAnalyzer {
+    #[allow(dead_code)] // Reserved for future depth limiting feature
     max_depth: usize,
 }
 
@@ -39,7 +41,7 @@ impl DiskAnalyzer {
     /// Calculate size of a single file or directory
     pub fn calculate_size<P: AsRef<Path>>(path: P) -> Result<u64> {
         let path = path.as_ref();
-        
+
         if !path.exists() {
             return Ok(0);
         }
@@ -49,7 +51,7 @@ impl DiskAnalyzer {
         }
 
         let mut total_size = 0u64;
-        
+
         for entry in WalkDir::new(path).follow_links(false) {
             match entry {
                 Ok(entry) => {
@@ -67,11 +69,17 @@ impl DiskAnalyzer {
     }
 
     /// Analyze directory contents and return sorted entries by size
-    pub async fn analyze_directory<P: AsRef<Path>>(&self, target_path: P) -> Result<Vec<DirectoryEntry>> {
+    pub async fn analyze_directory<P: AsRef<Path>>(
+        &self,
+        target_path: P,
+    ) -> Result<Vec<DirectoryEntry>> {
         let path = target_path.as_ref();
-        
+
         if !path.exists() {
-            return Err(anyhow::anyhow!("Directory '{}' does not exist", path.display()));
+            return Err(anyhow::anyhow!(
+                "Directory '{}' does not exist",
+                path.display()
+            ));
         }
 
         if !path.is_dir() {
@@ -112,7 +120,11 @@ impl DiskAnalyzer {
     }
 
     /// Get entries that match a specific pattern or filter
-    pub fn filter_entries(&self, entries: &[DirectoryEntry], min_size: Option<u64>) -> Vec<DirectoryEntry> {
+    pub fn filter_entries(
+        &self,
+        entries: &[DirectoryEntry],
+        min_size: Option<u64>,
+    ) -> Vec<DirectoryEntry> {
         entries
             .iter()
             .filter(|entry| {
@@ -130,9 +142,9 @@ impl DiskAnalyzer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::TempDir;
     use std::fs::File;
     use std::io::Write;
+    use tempfile::TempDir;
     use tokio::test;
 
     fn create_test_structure() -> Result<TempDir> {
@@ -144,7 +156,7 @@ mod tests {
         file1.write_all(&vec![b'x'; 1000])?; // 1KB
 
         let mut file2 = File::create(base_path.join("small_file.txt"))?;
-        file2.write_all(&vec![b'y'; 100])?; // 100 bytes
+        file2.write_all(&[b'y'; 100])?; // 100 bytes
 
         // Create subdirectory with file
         fs::create_dir(base_path.join("subdir"))?;
@@ -161,7 +173,7 @@ mod tests {
     async fn test_calculate_file_size() {
         let temp_dir = create_test_structure().unwrap();
         let file_path = temp_dir.path().join("large_file.txt");
-        
+
         let size = DiskAnalyzer::calculate_size(&file_path).unwrap();
         assert_eq!(size, 1000);
     }
@@ -170,7 +182,7 @@ mod tests {
     async fn test_calculate_directory_size() {
         let temp_dir = create_test_structure().unwrap();
         let subdir_path = temp_dir.path().join("subdir");
-        
+
         let size = DiskAnalyzer::calculate_size(&subdir_path).unwrap();
         assert_eq!(size, 500);
     }
@@ -179,20 +191,21 @@ mod tests {
     async fn test_analyze_directory() {
         let temp_dir = create_test_structure().unwrap();
         let analyzer = DiskAnalyzer::new(1);
-        
+
         let entries = analyzer.analyze_directory(temp_dir.path()).await.unwrap();
-        
+
         // Should have 4 entries: 2 files + 2 directories
         assert_eq!(entries.len(), 4);
-        
+
         // Check if sorted by size (largest first)
         assert!(entries[0].size_bytes >= entries[1].size_bytes);
-        
+
         // Verify specific entries exist
-        let names: Vec<String> = entries.iter()
+        let names: Vec<String> = entries
+            .iter()
             .map(|e| e.path.file_name().unwrap().to_string_lossy().to_string())
             .collect();
-        
+
         assert!(names.contains(&"large_file.txt".to_string()));
         assert!(names.contains(&"small_file.txt".to_string()));
         assert!(names.contains(&"subdir".to_string()));
@@ -203,10 +216,10 @@ mod tests {
     async fn test_directory_entry_creation() {
         let path = PathBuf::from("/test/path");
         let entry = DirectoryEntry::new(path.clone(), 1024, true);
-        
+
         assert_eq!(entry.path, path);
         assert_eq!(entry.size_bytes, 1024);
-        assert_eq!(entry.is_directory, true);
+        assert!(entry.is_directory);
         assert_eq!(entry.size_human, "1.02 kB");
     }
 
@@ -217,10 +230,10 @@ mod tests {
             DirectoryEntry::new(PathBuf::from("medium"), 500, false),
             DirectoryEntry::new(PathBuf::from("small"), 100, false),
         ];
-        
+
         let analyzer = DiskAnalyzer::new(1);
         let filtered = analyzer.filter_entries(&entries, Some(400));
-        
+
         assert_eq!(filtered.len(), 2);
         assert_eq!(filtered[0].path, PathBuf::from("large"));
         assert_eq!(filtered[1].path, PathBuf::from("medium"));
@@ -230,7 +243,7 @@ mod tests {
     async fn test_nonexistent_directory() {
         let analyzer = DiskAnalyzer::new(1);
         let result = analyzer.analyze_directory("/nonexistent/path").await;
-        
+
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("does not exist"));
     }
@@ -239,12 +252,15 @@ mod tests {
     async fn test_file_instead_of_directory() {
         let temp_dir = create_test_structure().unwrap();
         let file_path = temp_dir.path().join("large_file.txt");
-        
+
         let analyzer = DiskAnalyzer::new(1);
         let result = analyzer.analyze_directory(&file_path).await;
-        
+
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("is not a directory"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("is not a directory"));
     }
 
     #[test]

@@ -1,6 +1,6 @@
-use anyhow::Result;
-use dialoguer::{MultiSelect, Confirm, theme::ColorfulTheme};
 use crate::analyzer::DirectoryEntry;
+use anyhow::Result;
+use dialoguer::{theme::ColorfulTheme, Confirm, MultiSelect};
 use std::fs;
 use std::path::Path;
 
@@ -28,7 +28,9 @@ impl FileManager {
             .iter()
             .map(|entry| {
                 let file_type = if entry.is_directory { "DIR " } else { "FILE" };
-                let name = entry.path.file_name()
+                let name = entry
+                    .path
+                    .file_name()
                     .map(|n| n.to_string_lossy())
                     .unwrap_or_else(|| entry.path.to_string_lossy());
                 format!("{:>8} {:>4} {}", entry.size_human, file_type, name)
@@ -42,10 +44,8 @@ impl FileManager {
 
         match selection {
             Some(indices) => {
-                let selected: Vec<DirectoryEntry> = indices
-                    .into_iter()
-                    .map(|i| entries[i].clone())
-                    .collect();
+                let selected: Vec<DirectoryEntry> =
+                    indices.into_iter().map(|i| entries[i].clone()).collect();
                 Ok(selected)
             }
             None => {
@@ -62,11 +62,16 @@ impl FileManager {
         }
 
         println!("\n🚨 WARNING: The following items will be permanently deleted:");
-        
+
         let mut total_size = 0u64;
         for entry in entries {
             let file_type = if entry.is_directory { "DIR " } else { "FILE" };
-            println!("  {:>8} {:>4} {}", entry.size_human, file_type, entry.path.display());
+            println!(
+                "  {:>8} {:>4} {}",
+                entry.size_human,
+                file_type,
+                entry.path.display()
+            );
             total_size += entry.size_bytes;
         }
 
@@ -87,8 +92,13 @@ impl FileManager {
         let mut failed = Vec::new();
 
         for (i, entry) in entries.iter().enumerate() {
-            print!("Deleting {}/{}: {}... ", i + 1, entries.len(), entry.path.display());
-            
+            print!(
+                "Deleting {}/{}: {}... ",
+                i + 1,
+                entries.len(),
+                entry.path.display()
+            );
+
             match self.delete_single_entry(&entry.path, entry.is_directory) {
                 Ok(()) => {
                     println!("✅");
@@ -107,7 +117,7 @@ impl FileManager {
     /// Delete a single file or directory
     fn delete_single_entry<P: AsRef<Path>>(&self, path: P, is_directory: bool) -> Result<()> {
         let path = path.as_ref();
-        
+
         if !path.exists() {
             return Err(anyhow::anyhow!("Path does not exist"));
         }
@@ -139,12 +149,14 @@ impl FileManager {
 
         println!("\n📊 Directory Contents (sorted by size):");
         println!("{:-<60}", "");
-        println!("{:>8} {:>4} {}", "SIZE", "TYPE", "NAME");
+        println!("{:>8} {:>4} NAME", "SIZE", "TYPE");
         println!("{:-<60}", "");
 
         for entry in entries {
             let file_type = if entry.is_directory { "DIR " } else { "FILE" };
-            let name = entry.path.file_name()
+            let name = entry
+                .path
+                .file_name()
                 .map(|n| n.to_string_lossy())
                 .unwrap_or_else(|| entry.path.to_string_lossy());
             println!("{:>8} {:>4} {}", entry.size_human, file_type, name);
@@ -153,7 +165,7 @@ impl FileManager {
         let total_size: u64 = entries.iter().map(|e| e.size_bytes).sum();
         let total_human = humansize::format_size(total_size, humansize::DECIMAL);
         println!("{:-<60}", "");
-        println!("{:>8} {:>4} {}", total_human, "", "TOTAL");
+        println!("{:>8} {:>4} TOTAL", total_human, "");
     }
 }
 
@@ -166,10 +178,10 @@ impl Default for FileManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::TempDir;
     use std::fs::File;
     use std::io::Write;
     use std::path::PathBuf;
+    use tempfile::TempDir;
 
     fn create_test_files() -> Result<TempDir> {
         let temp_dir = TempDir::new()?;
@@ -193,20 +205,19 @@ mod tests {
     #[test]
     fn test_file_manager_creation() {
         let _manager = FileManager::new();
-        // Should create without panicking
-        assert!(true);
+        // Should create without panicking - no assertion needed
     }
 
     #[test]
     fn test_delete_single_file() -> Result<()> {
         let temp_dir = create_test_files()?;
         let file_path = temp_dir.path().join("test1.txt");
-        
+
         assert!(file_path.exists());
-        
+
         let manager = FileManager::new();
         manager.delete_single_entry(&file_path, false)?;
-        
+
         assert!(!file_path.exists());
         Ok(())
     }
@@ -215,13 +226,13 @@ mod tests {
     fn test_delete_single_directory() -> Result<()> {
         let temp_dir = create_test_files()?;
         let dir_path = temp_dir.path().join("test_dir");
-        
+
         assert!(dir_path.exists());
         assert!(dir_path.is_dir());
-        
+
         let manager = FileManager::new();
         manager.delete_single_entry(&dir_path, true)?;
-        
+
         assert!(!dir_path.exists());
         Ok(())
     }
@@ -230,7 +241,7 @@ mod tests {
     fn test_delete_nonexistent_file() {
         let manager = FileManager::new();
         let result = manager.delete_single_entry("/nonexistent/file.txt", false);
-        
+
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("does not exist"));
     }
@@ -239,20 +250,24 @@ mod tests {
     fn test_validate_entries() -> Result<()> {
         let temp_dir = create_test_files()?;
         let manager = FileManager::new();
-        
+
         let entries = vec![
             DirectoryEntry::new(temp_dir.path().join("test1.txt"), 100, false),
             DirectoryEntry::new(temp_dir.path().join("nonexistent.txt"), 200, false),
             DirectoryEntry::new(temp_dir.path().join("test_dir"), 300, true),
         ];
-        
+
         let valid_entries = manager.validate_entries(&entries);
-        
+
         // Should only include existing files
         assert_eq!(valid_entries.len(), 2);
-        assert!(valid_entries.iter().any(|e| e.path.file_name().unwrap() == "test1.txt"));
-        assert!(valid_entries.iter().any(|e| e.path.file_name().unwrap() == "test_dir"));
-        
+        assert!(valid_entries
+            .iter()
+            .any(|e| e.path.file_name().unwrap() == "test1.txt"));
+        assert!(valid_entries
+            .iter()
+            .any(|e| e.path.file_name().unwrap() == "test_dir"));
+
         Ok(())
     }
 
@@ -260,21 +275,21 @@ mod tests {
     fn test_delete_entries() -> Result<()> {
         let temp_dir = create_test_files()?;
         let manager = FileManager::new();
-        
+
         let entries = vec![
             DirectoryEntry::new(temp_dir.path().join("test1.txt"), 100, false),
             DirectoryEntry::new(temp_dir.path().join("test2.txt"), 200, false),
         ];
-        
+
         let (deleted, failed) = manager.delete_entries(&entries)?;
-        
+
         assert_eq!(deleted.len(), 2);
         assert_eq!(failed.len(), 0);
-        
+
         // Verify files are actually deleted
         assert!(!temp_dir.path().join("test1.txt").exists());
         assert!(!temp_dir.path().join("test2.txt").exists());
-        
+
         Ok(())
     }
 
@@ -282,20 +297,20 @@ mod tests {
     fn test_delete_entries_with_failures() -> Result<()> {
         let temp_dir = create_test_files()?;
         let manager = FileManager::new();
-        
+
         let entries = vec![
             DirectoryEntry::new(temp_dir.path().join("test1.txt"), 100, false),
             DirectoryEntry::new(temp_dir.path().join("nonexistent.txt"), 200, false),
         ];
-        
+
         let (deleted, failed) = manager.delete_entries(&entries)?;
-        
+
         assert_eq!(deleted.len(), 1);
         assert_eq!(failed.len(), 1);
-        
+
         assert!(deleted[0].contains("test1.txt"));
         assert!(failed[0].contains("nonexistent.txt"));
-        
+
         Ok(())
     }
 
@@ -303,7 +318,7 @@ mod tests {
     fn test_display_summary_empty() {
         let manager = FileManager::new();
         let entries: Vec<DirectoryEntry> = vec![];
-        
+
         // Should not panic
         manager.display_summary(&entries);
     }
@@ -315,7 +330,7 @@ mod tests {
             DirectoryEntry::new(PathBuf::from("large.txt"), 1000, false),
             DirectoryEntry::new(PathBuf::from("small_dir"), 500, true),
         ];
-        
+
         // Should not panic
         manager.display_summary(&entries);
     }

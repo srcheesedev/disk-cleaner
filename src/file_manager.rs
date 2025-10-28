@@ -1,3 +1,36 @@
+//! # File Management and User Interface Module
+//!
+//! Provides safe file operations and interactive user interfaces for the disk cleaner.
+//! This module handles all user interactions, file deletion operations, and safety validations.
+//!
+//! ## Key Features
+//!
+//! - **Interactive Selection**: Multi-select interface with beautiful formatting
+//! - **Safety First**: Comprehensive validation and permission checking before operations
+//! - **Cross-Platform**: Uses platform-specific utilities for reliable file operations
+//! - **User Feedback**: Clear progress indicators and detailed error reporting
+//! - **Confirmation Flows**: Multiple confirmation steps to prevent accidental deletions
+//!
+//! ## Safety Guarantees
+//!
+//! - **Permission Validation**: Checks write permissions before attempting deletions
+//! - **Existence Verification**: Validates all paths exist before operations
+//! - **User Confirmation**: Requires explicit user confirmation for all destructive operations
+//! - **Atomic Operations**: Each file operation is handled independently with proper error handling
+//! - **Detailed Reporting**: Comprehensive success/failure reporting with specific error messages
+//!
+//! ## Usage Example
+//!
+//! ```rust
+//! let manager = FileManager::new();
+//! let selected = manager.interactive_select(&entries)?;
+//! let valid = manager.validate_entries(&selected);
+//! 
+//! if manager.confirm_deletion(&valid)? {
+//!     let (deleted, failed) = manager.delete_entries(&valid)?;
+//! }
+//! ```
+
 use crate::analyzer::DirectoryEntry;
 use crate::platform::PlatformUtils;
 use anyhow::Result;
@@ -5,7 +38,46 @@ use dialoguer::{theme::ColorfulTheme, Confirm, MultiSelect};
 use std::path::Path;
 
 /// Handles user interaction for file selection and deletion
-pub struct FileManager {
+/// Safe file operations manager with interactive user interface capabilities.
+///
+/// The `FileManager` provides a safe, user-friendly interface for file operations
+/// with comprehensive validation, permission checking, and interactive confirmation flows.
+/// All operations are designed with safety as the primary concern.
+///
+/// # Safety Features
+///
+/// - **Multi-step Validation**: Validates existence, permissions, and user intent
+/// - **Cross-platform Support**: Uses platform-specific utilities for reliable operations
+/// - **Detailed Reporting**: Comprehensive success/failure reporting with specific errors
+/// - **User Confirmation**: Requires explicit confirmation before any destructive operations
+/// - **Atomic Operations**: Each file/directory operation is handled independently
+///
+/// # User Interface
+///
+/// - **Multi-select Interface**: Beautiful, intuitive selection interface using `dialoguer`
+/// - **Formatted Display**: Clear size formatting and file type indicators
+/// - **Progress Feedback**: Real-time progress reporting during operations
+/// - **Error Communication**: User-friendly error messages with actionable suggestions
+///
+/// # Examples
+///
+/// ```rust
+/// let manager = FileManager::new();
+///
+/// // Interactive file selection
+/// let selected = manager.interactive_select(&all_entries)?;
+///
+/// // Validate before operation
+/// let valid = manager.validate_entries(&selected);
+/// let unwritable = manager.get_unwritable_entries(&selected);
+///
+/// // Get user confirmation
+/// if manager.confirm_deletion(&valid)? {
+///     let (deleted, failed) = manager.delete_entries(&valid)?;
+///     println!("Successfully deleted {} items", deleted.len());
+/// }
+/// ```
+pub struct FileManager;
     theme: ColorfulTheme,
 }
 

@@ -1,8 +1,75 @@
+//! # Cross-Platform File Operations Module
+//!
+//! Provides unified file operations that work reliably across Windows, Linux, and macOS.
+//! This module abstracts away platform-specific differences in file permissions,
+//! attributes, and deletion behaviors.
+//!
+//! ## Platform Support
+//!
+//! - **Windows**: Handles read-only attributes, NTFS permissions, and Windows-specific error codes
+//! - **Linux/Unix**: Manages POSIX permissions, symbolic links, and Unix file attributes  
+//! - **macOS**: Full support for HFS+/APFS filesystems with proper permission handling
+//!
+//! ## Key Features
+//!
+//! - **Permission Detection**: Cross-platform permission checking before operations
+//! - **Safe Deletion**: Platform-appropriate deletion with proper error handling
+//! - **Attribute Management**: Automatically handles read-only and other special attributes
+//! - **Error Translation**: Converts platform-specific errors to user-friendly messages
+//! - **Performance Optimized**: Minimal overhead while maintaining safety guarantees
+//!
+//! ## Usage Example
+//!
+//! ```rust
+//! use platform::PlatformUtils;
+//!
+//! // Check if we can delete a file
+//! if PlatformUtils::can_delete(&path) {
+//!     PlatformUtils::safe_delete(&path, is_directory)?;
+//! } else {
+//!     println!("Permission denied for: {}", path.display());
+//! }
+//! ```
+
 use std::fs;
 use std::path::Path;
 use anyhow::Result;
 
-/// Cross-platform file permissions and deletion utilities
+/// Cross-platform file operations utility with comprehensive platform support.
+///
+/// `PlatformUtils` provides a unified interface for file operations that behave
+/// consistently across Windows, Linux, and macOS. It handles platform-specific
+/// quirks like Windows read-only attributes, Unix permissions, and filesystem-specific
+/// behaviors.
+///
+/// ## Design Principles
+///
+/// - **Safety First**: All operations include comprehensive validation and error handling
+/// - **Platform Agnostic**: Uniform API that abstracts platform differences
+/// - **Performance Conscious**: Minimal overhead while maintaining reliability
+/// - **Error Transparency**: Clear error messages with platform-specific context
+/// - **Future Proof**: Extensible design for additional platform support
+///
+/// ## Supported Platforms
+///
+/// - **Windows**: Full support for NTFS, FAT32, and modern Windows filesystems
+/// - **Linux**: Complete POSIX compliance with ext4, XFS, Btrfs support
+/// - **macOS**: Native support for APFS and HFS+ with proper permission handling
+///
+/// ## Examples
+///
+/// ```rust
+/// // Check deletion permissions
+/// if PlatformUtils::can_delete(&file_path) {
+///     println!("File can be safely deleted");
+/// }
+///
+/// // Perform safe deletion with automatic attribute handling
+/// match PlatformUtils::safe_delete(&file_path, false) {
+///     Ok(()) => println!("File deleted successfully"),
+///     Err(e) => println!("Deletion failed: {}", e),
+/// }
+/// ```
 pub struct PlatformUtils;
 
 impl PlatformUtils {

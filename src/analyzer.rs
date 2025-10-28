@@ -1,3 +1,27 @@
+//! # Directory Analysis Module
+//!
+//! High-performance directory size analysis with async processing capabilities.
+//! This module provides the core functionality for scanning filesystems and
+//! calculating directory sizes efficiently.
+//!
+//! ## Key Features
+//!
+//! - **Async Processing**: Non-blocking directory traversal for large filesystems
+//! - **Size Calculation**: Accurate byte-level size reporting with human-readable formatting
+//! - **Flexible Filtering**: Filter by minimum size and entry type (files/directories)
+//! - **Error Resilience**: Graceful handling of permission errors and inaccessible files
+//! - **Cross-Platform**: Works reliably on Windows, Linux, and macOS
+//!
+//! ## Usage Example
+//!
+//! ```rust
+//! use analyzer::DiskAnalyzer;
+//!
+//! let analyzer = DiskAnalyzer::new(2); // Depth limit of 2
+//! let entries = analyzer.analyze_directory("/path/to/scan").await?;
+//! let large_files = analyzer.filter_entries(&entries, Some(1_000_000)); // >1MB
+//! ```
+
 use anyhow::Result;
 use humansize::{format_size, DECIMAL};
 use std::fs;
@@ -5,16 +29,63 @@ use std::path::{Path, PathBuf};
 use tokio::task;
 use walkdir::WalkDir;
 
-/// Represents a directory or file entry with size information
+/// Represents a filesystem entry (file or directory) with comprehensive metadata.
+///
+/// This structure contains all the information needed to display, sort, and operate
+/// on filesystem entries in the disk cleaner interface.
+///
+/// # Fields
+///
+/// * `path` - The full filesystem path to this entry
+/// * `size_bytes` - Size in bytes (for files: file size, for directories: total recursive size)
+/// * `size_human` - Human-readable size string (e.g., "1.2 GB", "456 MB")
+/// * `is_directory` - Whether this entry represents a directory or a file
+///
+/// # Examples
+///
+/// ```rust
+/// let entry = DirectoryEntry::new(
+///     PathBuf::from("/home/user/documents"),
+///     1073741824, // 1 GB
+///     true        // is directory
+/// );
+/// assert_eq!(entry.size_human, "1.1 GB");
+/// ```
 #[derive(Debug, Clone, PartialEq)]
 pub struct DirectoryEntry {
+    /// Full filesystem path to this entry
     pub path: PathBuf,
+    /// Size in bytes (recursive for directories)  
     pub size_bytes: u64,
+    /// Human-readable size string (e.g., "1.2 GB")
     pub size_human: String,
+    /// True if this entry is a directory, false if it's a file
     pub is_directory: bool,
 }
 
 impl DirectoryEntry {
+    /// Creates a new directory entry with automatic human-readable size formatting.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - The filesystem path to this entry
+    /// * `size_bytes` - Size in bytes (recursive total for directories)
+    /// * `is_directory` - Whether this entry represents a directory
+    ///
+    /// # Returns
+    ///
+    /// A new `DirectoryEntry` with automatically formatted human-readable size.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// let file_entry = DirectoryEntry::new(
+    ///     PathBuf::from("large_video.mp4"),
+    ///     2147483648, // 2 GB
+    ///     false
+    /// );
+    /// assert_eq!(file_entry.size_human, "2.1 GB");
+    /// ```
     pub fn new(path: PathBuf, size_bytes: u64, is_directory: bool) -> Self {
         let size_human = format_size(size_bytes, DECIMAL);
         Self {
@@ -26,7 +97,31 @@ impl DirectoryEntry {
     }
 }
 
-/// Main analyzer struct for disk operations
+/// High-performance directory analyzer with async processing capabilities.
+///
+/// The `DiskAnalyzer` provides efficient filesystem scanning and size calculation
+/// using async operations to prevent blocking on large directory structures.
+/// It supports configurable depth limits and comprehensive error handling.
+///
+/// # Performance Characteristics
+///
+/// - **Async Operations**: Non-blocking I/O for responsive user experience
+/// - **Memory Efficient**: Streams results without loading entire filesystem in memory  
+/// - **Concurrent Processing**: Leverages tokio's task scheduler for parallel operations
+/// - **Error Resilient**: Continues processing despite individual file access failures
+///
+/// # Examples
+///
+/// ```rust
+/// // Create analyzer with depth limit
+/// let analyzer = DiskAnalyzer::new(3);
+///
+/// // Analyze directory asynchronously
+/// let entries = analyzer.analyze_directory("/home/user").await?;
+///
+/// // Filter large files only
+/// let large_files = analyzer.filter_entries(&entries, Some(100_000_000));
+/// ```
 #[derive(Debug)]
 pub struct DiskAnalyzer {
     #[allow(dead_code)] // Reserved for future depth limiting feature

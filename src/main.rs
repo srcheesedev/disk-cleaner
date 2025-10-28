@@ -1,3 +1,33 @@
+//! # Disk Cleaner - Interactive Directory Analysis Tool
+//!
+//! A high-performance, cross-platform disk space analyzer with interactive cleanup capabilities.
+//! Built with Rust for maximum performance and safety.
+//!
+//! ## Features
+//!
+//! - 🚀 **High Performance**: Async directory scanning for large filesystems
+//! - 🎯 **Interactive Selection**: Multi-select interface powered by `fzf`-like functionality  
+//! - 🔒 **Safe Operations**: Permission checking and validation before deletion
+//! - 🌍 **Cross-Platform**: Full Windows, Linux, and macOS support
+//! - 📊 **Smart Filtering**: Filter by size, type, and depth
+//! - 💾 **Human-Readable**: Beautiful size formatting (KB, MB, GB)
+//!
+//! ## Usage
+//!
+//! ```bash
+//! # Analyze current directory
+//! disk-cleaner
+//!
+//! # Analyze specific directory with depth limit
+//! disk-cleaner /path/to/analyze --depth 3
+//!
+//! # Show only large files (>100MB)
+//! disk-cleaner --min-size 104857600
+//!
+//! # Show only directories
+//! disk-cleaner --dirs-only
+//! ```
+
 mod analyzer;
 mod file_manager;
 mod platform;
@@ -9,32 +39,87 @@ use std::path::PathBuf;
 use analyzer::DiskAnalyzer;
 use file_manager::FileManager;
 
+/// Command-line interface configuration for the disk cleaner application.
+///
+/// This struct defines all the available command-line options and their
+/// default values, using the `clap` crate for automatic parsing and help generation.
 #[derive(Parser)]
 #[command(name = "disk-cleaner")]
 #[command(about = "Interactive directory size analyzer and cleanup tool")]
 #[command(version = "0.1.0")]
+#[command(long_about = "
+🔍 Disk Cleaner - Interactive Directory Analysis Tool
+
+A high-performance, cross-platform disk space analyzer with interactive cleanup capabilities.
+Analyze directory sizes, find space hogs, and safely delete unwanted files with an intuitive
+multi-select interface.
+
+Features:
+  • High-performance async directory scanning
+  • Interactive multi-select deletion interface  
+  • Cross-platform permission checking
+  • Smart filtering by size, type, and depth
+  • Beautiful human-readable size formatting
+  • Safe operations with validation checks
+")]
 struct Cli {
-    /// Directory to analyze
+    /// Directory to analyze for disk usage
+    /// 
+    /// Specify the target directory to scan. If not provided, analyzes the current directory.
+    /// The tool will recursively scan subdirectories up to the specified depth limit.
     #[arg(default_value = ".")]
     path: PathBuf,
 
-    /// Maximum depth to analyze
+    /// Maximum directory depth to analyze
+    /// 
+    /// Controls how deep the recursive directory scan goes. Depth 1 means only immediate
+    /// children, depth 2 includes grandchildren, etc. Higher values provide more detail
+    /// but take longer to process.
     #[arg(short, long, default_value = "1")]
     depth: usize,
 
-    /// Minimum size to display (in bytes)
+    /// Minimum file/directory size threshold (in bytes)
+    /// 
+    /// Only show entries larger than this size. Useful for finding space hogs.
+    /// Examples: 1048576 (1MB), 104857600 (100MB), 1073741824 (1GB)
     #[arg(short, long)]
     min_size: Option<u64>,
 
-    /// Show only directories
+    /// Show only directories in results
+    /// 
+    /// Filter results to display directories only, hiding individual files.
+    /// Cannot be used together with --files-only.
     #[arg(long)]
     dirs_only: bool,
 
-    /// Show only files
+    /// Show only files in results
+    /// 
+    /// Filter results to display files only, hiding directories.
+    /// Cannot be used together with --dirs-only.
     #[arg(long)]
     files_only: bool,
 }
 
+/// Application entry point.
+/// 
+/// Orchestrates the disk analysis workflow by:
+/// 1. Parsing command-line arguments
+/// 2. Initializing analysis and file management components  
+/// 3. Performing directory analysis with filtering
+/// 4. Presenting interactive selection interface
+/// 5. Safely executing user-confirmed deletions
+/// 6. Reporting results and freed space
+///
+/// # Returns
+/// 
+/// `Ok(())` on successful completion, or an error if any step fails.
+///
+/// # Errors
+/// 
+/// Returns error if:
+/// - Target directory doesn't exist or isn't accessible
+/// - File system operations fail due to permissions
+/// - User interface interactions fail
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();

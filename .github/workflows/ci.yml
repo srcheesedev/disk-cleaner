@@ -1,0 +1,215 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    name: Test Suite
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        rust: [stable, beta]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        toolchain: ${{ matrix.rust }}
+        components: rustfmt, clippy
+
+    - name: Cache dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Check formatting
+      run: cargo fmt --all -- --check
+
+    - name: Lint with clippy
+      run: cargo clippy --all-targets --all-features -- -D warnings
+
+    - name: Run tests
+      run: cargo test --verbose
+
+    - name: Check documentation
+      run: cargo doc --no-deps --document-private-items
+
+  security:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      
+    - name: Install cargo-audit
+      run: cargo install cargo-audit
+      
+    - name: Run security audit
+      run: cargo audit
+
+  build:
+    name: Build Release
+    needs: [test, security]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            suffix: ""
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            suffix: ".exe"
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            suffix: ""
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            suffix: ""
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: ${{ matrix.target }}
+
+    - name: Cache dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Build release
+      run: cargo build --release --target ${{ matrix.target }}
+
+    - name: Create archive
+      shell: bash
+      run: |
+        mkdir -p dist
+        if [ "${{ matrix.os }}" = "windows-latest" ]; then
+          cp target/${{ matrix.target }}/release/disk-cleaner-rs${{ matrix.suffix }} dist/
+          cp README.md LICENSE dist/
+          cd dist && 7z a ../disk-cleaner-${{ matrix.target }}.zip *
+        else
+          cp target/${{ matrix.target }}/release/disk-cleaner-rs${{ matrix.suffix }} dist/
+          cp README.md LICENSE install.sh dist/
+          cd dist && tar -czf ../disk-cleaner-${{ matrix.target }}.tar.gz *
+        fi
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: disk-cleaner-${{ matrix.target }}
+        path: |
+          disk-cleaner-${{ matrix.target }}.tar.gz
+          disk-cleaner-${{ matrix.target }}.zip
+        if-no-files-found: ignore
+
+  release:
+    name: Create Release
+    needs: [build]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Download all artifacts
+      uses: actions/download-artifact@v3
+
+    - name: Generate changelog
+      id: changelog
+      run: |
+        # Extract version from tag
+        VERSION=${GITHUB_REF#refs/tags/}
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        
+        # Generate changelog for this release
+        if [ -f CHANGELOG.md ]; then
+          # Extract changelog section for this version
+          awk "/## \[$VERSION\]/,/## \[.*\]/ { if (/## \[.*\]/ && !/## \[$VERSION\]/) exit; print }" CHANGELOG.md > release_notes.md
+        else
+          echo "Release $VERSION" > release_notes.md
+          echo "" >> release_notes.md
+          echo "See commit history for changes." >> release_notes.md
+        fi
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        name: Release ${{ steps.changelog.outputs.version }}
+        body_path: release_notes.md
+        files: |
+          disk-cleaner-*/disk-cleaner-*.tar.gz
+          disk-cleaner-*/disk-cleaner-*.zip
+        draft: false
+        prerelease: ${{ contains(github.ref, '-') }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  update-changelog:
+    name: Update Changelog
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        fetch-depth: 0
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+
+    - name: Install conventional-changelog
+      run: npm install -g conventional-changelog-cli
+
+    - name: Update CHANGELOG.md
+      run: |
+        # Generate changelog
+        conventional-changelog -p angular -i CHANGELOG.md -s
+        
+        # Check if there are changes
+        if git diff --quiet CHANGELOG.md; then
+          echo "No changelog updates needed"
+          exit 0
+        fi
+
+    - name: Commit changelog
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add CHANGELOG.md
+        git commit -m "docs: update changelog [skip ci]" || exit 0
+        git push

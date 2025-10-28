@@ -6,10 +6,12 @@ on:
     tags: [ 'v*' ]
   pull_request:
     branches: [ main ]
+    types: [ opened, synchronize, reopened, closed ]
 
 permissions:
   contents: write
-  pull-requests: read
+  pull-requests: write
+  actions: read
 
 env:
   CARGO_TERM_COLOR: always
@@ -217,3 +219,167 @@ jobs:
   #       git add CHANGELOG.md
   #       git commit -m "docs: update changelog [skip ci]" || exit 0
   #       git push
+
+  auto-release:
+    name: Auto Release on PR Merge
+    runs-on: ubuntu-latest
+    needs: [test, security]
+    if: github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'main'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+
+    - name: Install dependencies
+      run: |
+        npm install -g conventional-changelog-cli @semantic-release/exec
+        npm install -g semantic-release @semantic-release/changelog @semantic-release/git
+
+    - name: Configure Git
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+
+    - name: Get current version
+      id: current_version
+      run: |
+        if [ -f Cargo.toml ]; then
+          CURRENT_VERSION=$(grep '^version = ' Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+        else
+          CURRENT_VERSION="0.0.0"
+        fi
+        echo "current=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+        echo "Current version: $CURRENT_VERSION"
+
+    - name: Determine version bump
+      id: version_bump
+      run: |
+        # Get commit messages from PR
+        PR_COMMITS=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+          "https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/commits" \
+          | jq -r '.[].commit.message')
+        
+        echo "PR Commits:"
+        echo "$PR_COMMITS"
+        
+        # Determine version bump based on conventional commits
+        if echo "$PR_COMMITS" | grep -qE "^(feat|feature)(\(.+\))?!:|^.+!:"; then
+          echo "bump=major" >> $GITHUB_OUTPUT
+          echo "Version bump: MAJOR (breaking change)"
+        elif echo "$PR_COMMITS" | grep -qE "^(feat|feature)(\(.+\))?:"; then
+          echo "bump=minor" >> $GITHUB_OUTPUT
+          echo "Version bump: MINOR (new feature)"
+        elif echo "$PR_COMMITS" | grep -qE "^(fix|bugfix)(\(.+\))?:"; then
+          echo "bump=patch" >> $GITHUB_OUTPUT
+          echo "Version bump: PATCH (bug fix)"
+        else
+          echo "bump=patch" >> $GITHUB_OUTPUT
+          echo "Version bump: PATCH (default)"
+        fi
+
+    - name: Calculate new version
+      id: new_version
+      run: |
+        CURRENT="${{ steps.current_version.outputs.current }}"
+        BUMP="${{ steps.version_bump.outputs.bump }}"
+        
+        # Parse current version
+        IFS='.' read -ra VERSION_PARTS <<< "$CURRENT"
+        MAJOR=${VERSION_PARTS[0]:-0}
+        MINOR=${VERSION_PARTS[1]:-0}
+        PATCH=${VERSION_PARTS[2]:-0}
+        
+        # Bump version
+        case $BUMP in
+          major)
+            MAJOR=$((MAJOR + 1))
+            MINOR=0
+            PATCH=0
+            ;;
+          minor)
+            MINOR=$((MINOR + 1))
+            PATCH=0
+            ;;
+          patch)
+            PATCH=$((PATCH + 1))
+            ;;
+        esac
+        
+        NEW_VERSION="$MAJOR.$MINOR.$PATCH"
+        echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+        echo "New version: $NEW_VERSION"
+
+    - name: Update Cargo.toml version
+      run: |
+        NEW_VERSION="${{ steps.new_version.outputs.version }}"
+        sed -i "s/^version = \".*\"/version = \"$NEW_VERSION\"/" Cargo.toml
+        echo "Updated Cargo.toml to version $NEW_VERSION"
+
+    - name: Update CHANGELOG.md
+      run: |
+        NEW_VERSION="${{ steps.new_version.outputs.version }}"
+        TODAY=$(date +%Y-%m-%d)
+        
+        # Create temporary changelog content
+        echo "# Changelog" > CHANGELOG_NEW.md
+        echo "" >> CHANGELOG_NEW.md
+        echo "## [$NEW_VERSION] - $TODAY" >> CHANGELOG_NEW.md
+        echo "" >> CHANGELOG_NEW.md
+        
+        # Get PR title and description for changelog
+        PR_TITLE="${{ github.event.pull_request.title }}"
+        PR_BODY="${{ github.event.pull_request.body }}"
+        
+        echo "### Changes" >> CHANGELOG_NEW.md
+        echo "- $PR_TITLE (#${{ github.event.pull_request.number }})" >> CHANGELOG_NEW.md
+        
+        # Add PR body if it contains useful information
+        if [ ! -z "$PR_BODY" ] && [ "$PR_BODY" != "null" ]; then
+          echo "" >> CHANGELOG_NEW.md
+          echo "### Details" >> CHANGELOG_NEW.md
+          echo "$PR_BODY" >> CHANGELOG_NEW.md
+        fi
+        
+        echo "" >> CHANGELOG_NEW.md
+        
+        # Append existing changelog if it exists
+        if [ -f CHANGELOG.md ]; then
+          # Skip the first line (# Changelog) from existing file
+          tail -n +2 CHANGELOG.md >> CHANGELOG_NEW.md
+        fi
+        
+        mv CHANGELOG_NEW.md CHANGELOG.md
+
+    - name: Commit version and changelog
+      run: |
+        NEW_VERSION="${{ steps.new_version.outputs.version }}"
+        git add Cargo.toml CHANGELOG.md
+        git commit -m "chore: bump version to $NEW_VERSION [skip ci]"
+
+    - name: Create and push tag
+      run: |
+        NEW_VERSION="${{ steps.new_version.outputs.version }}"
+        git tag "v$NEW_VERSION"
+        git push origin "v$NEW_VERSION"
+        echo "Created and pushed tag v$NEW_VERSION"
+
+    - name: Push changes to main
+      run: |
+        git push origin main
+
+    - name: Sync develop branch
+      run: |
+        # Switch to develop and merge main
+        git fetch origin develop
+        git checkout develop
+        git merge main --no-ff -m "chore: sync develop with main after release [skip ci]"
+        git push origin develop
+        echo "Synced develop branch with main"

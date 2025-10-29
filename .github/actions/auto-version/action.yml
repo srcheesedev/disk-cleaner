@@ -17,7 +17,7 @@ inputs:
   version-pattern:
     description: 'Regex pattern to find version'
     required: false
-    default: '^version = "([^"]*)"'
+    default: '^version = "([0-9]+\.[0-9]+\.[0-9]+)"'
   token:
     description: 'GitHub token for operations'
     required: true
@@ -46,12 +46,14 @@ runs:
       id: current-version
       shell: bash
       run: |
-        if [ "${{ inputs.version-file }}" = "Cargo.toml" ]; then
-          CURRENT=$(grep '^version = ' Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
-        elif [ "${{ inputs.version-file }}" = "package.json" ]; then
-          CURRENT=$(grep '"version":' package.json | sed 's/.*"version": *"\([^"]*\)".*/\1/')
+        VERSION_FILE="${{ inputs.version-file }}"
+        if [ "$VERSION_FILE" = "Cargo.toml" ]; then
+          CURRENT=$(grep '^version = ' Cargo.toml | head -1 | cut -d'"' -f2)
+        elif [ "$VERSION_FILE" = "package.json" ]; then
+          CURRENT=$(grep '"version":' package.json | cut -d'"' -f4)
         else
-          CURRENT=$(grep -E "${{ inputs.version-pattern }}" "${{ inputs.version-file }}" | sed -E 's/${{ inputs.version-pattern }}/\1/')
+          PATTERN="${{ inputs.version-pattern }}"
+          CURRENT=$(grep -E "$PATTERN" "$VERSION_FILE" | sed -E "s|$PATTERN|\1|")
         fi
         echo "current=$CURRENT" >> $GITHUB_OUTPUT
         echo "📦 Current version: $CURRENT"
@@ -60,10 +62,12 @@ runs:
       id: analyze
       shell: bash
       run: |
-        echo "🔍 Analyzing commits between ${{ inputs.base-branch }} and ${{ inputs.head-branch }}..."
+        BASE_BRANCH="${{ inputs.base-branch }}"
+        HEAD_BRANCH="${{ inputs.head-branch }}"
+        echo "🔍 Analyzing commits between $BASE_BRANCH and $HEAD_BRANCH..."
         
         # Get commits that are in head but not in base
-        COMMITS=$(git log origin/${{ inputs.base-branch }}..origin/${{ inputs.head-branch }} --pretty=format:"%s" --no-merges)
+        COMMITS=$(git log "origin/$BASE_BRANCH..origin/$HEAD_BRANCH" --pretty=format:"%s" --no-merges)
         
         echo "📝 Commits to analyze:"
         echo "$COMMITS"
@@ -125,22 +129,25 @@ runs:
         echo "🎯 New version: $NEW_VERSION"
         
         # Update version in file
-        if [ "${{ inputs.version-file }}" = "Cargo.toml" ]; then
+        VERSION_FILE="${{ inputs.version-file }}"
+        if [ "$VERSION_FILE" = "Cargo.toml" ]; then
           sed -i "s/^version = \".*\"/version = \"$NEW_VERSION\"/" Cargo.toml
-        elif [ "${{ inputs.version-file }}" = "package.json" ]; then
+        elif [ "$VERSION_FILE" = "package.json" ]; then
           sed -i "s/\"version\": *\"[^\"]*\"/\"version\": \"$NEW_VERSION\"/" package.json
         fi
         
-        echo "✅ Updated ${{ inputs.version-file }} to version $NEW_VERSION"
+        echo "✅ Updated $VERSION_FILE to version $NEW_VERSION"
         
         # Create git tag
-        git add "${{ inputs.version-file }}"
+        VERSION_FILE="${{ inputs.version-file }}"
+        git add "$VERSION_FILE"
         git commit -m "chore: bump version to $NEW_VERSION"
         git tag "v$NEW_VERSION"
         echo "🏷️ Created tag v$NEW_VERSION"
         
         # Push changes
-        git push origin ${{ inputs.head-branch }}
+        HEAD_BRANCH="${{ inputs.head-branch }}"
+        git push origin "$HEAD_BRANCH"
         git push origin "v$NEW_VERSION"
         echo "✅ Pushed version and tag"
         

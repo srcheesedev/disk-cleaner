@@ -2,15 +2,24 @@
 name = "disk-cleaner-rs"
 version = "0.1.0"
 edition = "2021"
+authors = ["@srcheesedev"]
+license = "MIT"
+description = "A high-performance cross-platform disk analyzer and cleaner built with Rust"
+repository = "https://github.com/srcheesedev/disk-cleaner"
+homepage = "https://github.com/srcheesedev/disk-cleaner"
+documentation = "https://docs.rs/disk-cleaner-rs"
+keywords = ["disk", "cleaner", "analyzer", "storage", "utility"]
+categories = ["command-line-utilities", "filesystem"]
+readme = "README.md"
 
 [dependencies]
 clap = { version = "4.4", features = ["derive"] }
-tokio = { version = "1.0", features = ["full"] }
-crossterm = "0.27"
-tui = "0.19"
+tokio = { version = "1.40", features = ["full"] }
+crossterm = "0.28"
+ratatui = "0.28"
 serde = { version = "1.0", features = ["derive"] }
 humansize = "2.1"
-walkdir = "2.4"
+walkdir = "2.5"
 dialoguer = "0.11"
 anyhow = "1.0"
 thiserror = "1.0"

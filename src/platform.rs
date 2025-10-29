@@ -4,6 +4,9 @@
 //! This module abstracts away platform-specific differences in file permissions,
 //! attributes, and deletion behaviors.
 //!
+//! Copyright (c) 2025 @srcheesedev
+//! Licensed under the MIT License - see LICENSE file for details
+//!
 //! ## Platform Support
 //!
 //! - **Windows**: Handles read-only attributes, NTFS permissions, and Windows-specific error codes
@@ -146,7 +149,9 @@ impl PlatformUtils {
                     // Try to remove read-only attribute
                     let mut perms = metadata.permissions();
                     perms.set_readonly(false);
-                    let _ = fs::set_permissions(path, perms);
+                    if let Err(e) = fs::set_permissions(path, perms) {
+                        eprintln!("Warning: Could not remove read-only attribute: {}", e);
+                    }
                 }
             }
         }
@@ -166,7 +171,6 @@ impl PlatformUtils {
     }
 
     /// Get a user-friendly error message for common file operation errors
-    #[allow(dead_code)] // May be used in future for better error handling
     pub fn friendly_error_message(error: &std::io::Error) -> String {
         match error.kind() {
             std::io::ErrorKind::PermissionDenied => {

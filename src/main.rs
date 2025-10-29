@@ -3,6 +3,9 @@
 //! A high-performance, cross-platform disk space analyzer with interactive cleanup capabilities.
 //! Built with Rust for maximum performance and safety.
 //!
+//! Copyright (c) 2025 @srcheesedev
+//! Licensed under the MIT License - see LICENSE file for details
+//!
 //! ## Features
 //!
 //! - 🚀 **High Performance**: Async directory scanning for large filesystems
@@ -82,6 +85,7 @@ struct Cli {
     ///
     /// Only show entries larger than this size. Useful for finding space hogs.
     /// Examples: 1048576 (1MB), 104857600 (100MB), 1073741824 (1GB)
+    /// You can use the constants: --min-size 1048576 for 1MB files and above
     #[arg(short, long)]
     min_size: Option<u64>,
 
@@ -89,14 +93,14 @@ struct Cli {
     ///
     /// Filter results to display directories only, hiding individual files.
     /// Cannot be used together with --files-only.
-    #[arg(long)]
+    #[arg(long, group = "filter_type")]
     dirs_only: bool,
 
     /// Show only files in results
     ///
     /// Filter results to display files only, hiding directories.
     /// Cannot be used together with --dirs-only.
-    #[arg(long)]
+    #[arg(long, group = "filter_type")]
     files_only: bool,
 }
 
@@ -282,12 +286,15 @@ mod tests {
     }
 
     #[test]
-    fn test_cli_conflicting_flags() {
-        // This should work - last flag wins typically
-        let cli = Cli::parse_from(["disk-cleaner", "--dirs-only", "--files-only"]);
-
-        // Both flags can be set, but logic in main() should handle conflicts
-        assert!(cli.dirs_only);
-        assert!(cli.files_only);
+    fn test_cli_conflicting_flags_prevented() {
+        use clap::error::ErrorKind;
+        
+        // This should fail now with the group constraint
+        let result = Cli::try_parse_from(["disk-cleaner", "--dirs-only", "--files-only"]);
+        
+        assert!(result.is_err());
+        if let Err(err) = result {
+            assert_eq!(err.kind(), ErrorKind::ArgumentConflict);
+        }
     }
 }

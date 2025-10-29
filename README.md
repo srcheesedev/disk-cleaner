@@ -271,9 +271,20 @@ Have an idea? [Request a feature](https://github.com/srcheesedev/disk-cleaner/is
 
 ---
 
+## 👨‍💻 Author
+
+Created and maintained by **@srcheesedev**
+
+- 🐙 GitHub: [@srcheesedev](https://github.com/srcheesedev)
+- 🌐 Portfolio: [srcheesedev.com](https://srcheesedev.com)
+
+---
+
 ## 📜 License
 
 This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
+
+Copyright (c) 2025 @srcheesedev
 
 ---
 

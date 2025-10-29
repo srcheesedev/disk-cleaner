@@ -57,7 +57,7 @@ fn test_cli_help() {
 fn test_cli_version() {
     let mut cmd = get_test_command();
     cmd.arg("--version");
-    
+
     // Use the version from Cargo.toml instead of hardcoding
     let expected_version = env!("CARGO_PKG_VERSION");
     cmd.assert()

@@ -38,9 +38,16 @@ fn create_integration_test_structure() -> Result<TempDir, Box<dyn std::error::Er
     Ok(temp_dir)
 }
 
+/// Helper function to create a command for the binary
+fn get_test_command() -> Command {
+    // Use the modern way to get cargo binary command
+    let cmd = Command::new(env!("CARGO_BIN_EXE_disk-cleaner-rs"));
+    cmd
+}
+
 #[test]
 fn test_cli_help() {
-    let mut cmd = Command::cargo_bin("disk-cleaner-rs").unwrap();
+    let mut cmd = get_test_command();
     cmd.arg("--help");
     cmd.assert().success().stdout(predicate::str::contains(
         "Disk Cleaner - Interactive Directory Analysis Tool",
@@ -49,7 +56,7 @@ fn test_cli_help() {
 
 #[test]
 fn test_cli_version() {
-    let mut cmd = Command::cargo_bin("disk-cleaner-rs").unwrap();
+    let mut cmd = get_test_command();
     cmd.arg("--version");
     cmd.assert()
         .success()
@@ -60,7 +67,7 @@ fn test_cli_version() {
 fn test_analyze_directory_basic() {
     let temp_dir = create_integration_test_structure().unwrap();
 
-    let mut cmd = Command::cargo_bin("disk-cleaner-rs").unwrap();
+    let mut cmd = get_test_command();
     cmd.arg(temp_dir.path().to_str().unwrap())
         .arg("--depth")
         .arg("1");
@@ -80,7 +87,7 @@ fn test_analyze_directory_basic() {
 fn test_depth_limiting() {
     let temp_dir = create_integration_test_structure().unwrap();
 
-    let mut cmd = Command::cargo_bin("disk-cleaner-rs").unwrap();
+    let mut cmd = get_test_command();
     cmd.arg(temp_dir.path().to_str().unwrap())
         .arg("--depth")
         .arg("1");
@@ -97,7 +104,7 @@ fn test_depth_limiting() {
 fn test_size_filtering() {
     let temp_dir = create_integration_test_structure().unwrap();
 
-    let mut cmd = Command::cargo_bin("disk-cleaner-rs").unwrap();
+    let mut cmd = get_test_command();
     cmd.arg(temp_dir.path().to_str().unwrap())
         .arg("--min-size")
         .arg("1000") // 1KB minimum
@@ -117,7 +124,7 @@ fn test_size_filtering() {
 fn test_dirs_only_flag() {
     let temp_dir = create_integration_test_structure().unwrap();
 
-    let mut cmd = Command::cargo_bin("disk-cleaner-rs").unwrap();
+    let mut cmd = get_test_command();
     cmd.arg(temp_dir.path().to_str().unwrap())
         .arg("--dirs-only")
         .arg("--depth")
@@ -136,7 +143,7 @@ fn test_dirs_only_flag() {
 fn test_files_only_flag() {
     let temp_dir = create_integration_test_structure().unwrap();
 
-    let mut cmd = Command::cargo_bin("disk-cleaner-rs").unwrap();
+    let mut cmd = get_test_command();
     cmd.arg(temp_dir.path().to_str().unwrap())
         .arg("--files-only")
         .arg("--depth")
@@ -156,7 +163,7 @@ fn test_files_only_flag() {
 fn test_mutually_exclusive_flags() {
     let temp_dir = create_integration_test_structure().unwrap();
 
-    let mut cmd = Command::cargo_bin("disk-cleaner-rs").unwrap();
+    let mut cmd = get_test_command();
     cmd.arg(temp_dir.path().to_str().unwrap())
         .arg("--dirs-only")
         .arg("--files-only");
@@ -169,7 +176,7 @@ fn test_mutually_exclusive_flags() {
 
 #[test]
 fn test_nonexistent_directory() {
-    let mut cmd = Command::cargo_bin("disk-cleaner-rs").unwrap();
+    let mut cmd = get_test_command();
     cmd.arg("/definitely/does/not/exist");
 
     cmd.assert()
@@ -182,7 +189,7 @@ fn test_file_instead_of_directory() {
     let temp_dir = create_integration_test_structure().unwrap();
     let file_path = temp_dir.path().join("large_file.txt");
 
-    let mut cmd = Command::cargo_bin("disk-cleaner-rs").unwrap();
+    let mut cmd = get_test_command();
     cmd.arg(file_path.to_str().unwrap());
 
     cmd.assert()

@@ -11,6 +11,10 @@ inputs:
   platform:
     description: 'Platform name for artifact'
     required: true
+  package-type:
+    description: 'Package type to create (deb, rpm, pkg, msi, binary)'
+    required: false
+    default: 'binary'
   project-name:
     description: 'Project binary name'
     required: false
@@ -52,20 +56,19 @@ runs:
       id: package
       shell: bash
       run: |
-        mkdir -p dist
+        mkdir -p dist packages
         
         # Determine file extension
         if [[ "${{ runner.os }}" == "Windows" ]]; then
           SUFFIX=".exe"
-          ARCHIVE_EXT="zip"
         else
           SUFFIX=""
-          ARCHIVE_EXT="tar.gz"
         fi
         
         # Copy binary
-        cp "target/${{ inputs.target }}/release/${{ inputs.project-name }}${SUFFIX}" dist/
-        echo "📦 Copied binary: ${{ inputs.project-name }}${SUFFIX}"
+        BINARY_NAME="${{ inputs.project-name }}${SUFFIX}"
+        cp "target/${{ inputs.target }}/release/$BINARY_NAME" dist/
+        echo "📦 Copied binary: $BINARY_NAME"
         
         # Copy additional files
         for file in ${{ inputs.include-files }}; do
@@ -75,29 +78,188 @@ runs:
           fi
         done
         
-        # Copy scripts (Unix only)
-        if [[ "${{ runner.os }}" != "Windows" ]]; then
-          for script in ${{ inputs.include-scripts }}; do
-            if [ -f "$script" ]; then
-              cp "$script" dist/
-              chmod +x "dist/$script"
-              echo "📜 Included script: $script"
+        # Create packages based on type
+        case "${{ inputs.package-type }}" in
+          "deb")
+            echo "📦 Creating DEB package..."
+            # Install dependencies
+            sudo apt-get update && sudo apt-get install -y dpkg-dev
+            
+            # Create DEB structure
+            DEB_NAME="disk-cleaner_${{ inputs.version }}_amd64"
+            mkdir -p "${DEB_NAME}/usr/local/bin"
+            mkdir -p "${DEB_NAME}/DEBIAN"
+            
+            # Copy binary
+            cp "dist/${{ inputs.project-name }}" "${DEB_NAME}/usr/local/bin/disk-cleaner"
+            chmod +x "${DEB_NAME}/usr/local/bin/disk-cleaner"
+            
+            # Create control file
+            cat > "${DEB_NAME}/DEBIAN/control" << EOF
+        Package: disk-cleaner
+        Version: ${{ inputs.version }}
+        Section: utils
+        Priority: optional
+        Architecture: amd64
+        Maintainer: srcheesedev <dev@example.com>
+        Description: High-performance disk space analyzer and cleaner
+         A fast, cross-platform command-line tool for analyzing and cleaning disk space.
+         Built with Rust for maximum performance and memory safety.
+        EOF
+            
+            # Build DEB
+            dpkg-deb --build "${DEB_NAME}"
+            mv "${DEB_NAME}.deb" packages/
+            ARTIFACT_PATH="packages/${DEB_NAME}.deb"
+            ARTIFACT_NAME="$DEB_NAME"
+            ;;
+            
+          "rpm")
+            echo "📦 Creating RPM package..."
+            # Install dependencies
+            sudo apt-get update && sudo apt-get install -y rpm
+            
+            RPM_NAME="disk-cleaner-${{ inputs.version }}-1.x86_64"
+            
+            # Create RPM structure
+            mkdir -p rpm/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
+            mkdir -p rpm/BUILDROOT/disk-cleaner-${{ inputs.version }}-1.x86_64/usr/local/bin
+            
+            # Copy binary
+            cp "dist/${{ inputs.project-name }}" "rpm/BUILDROOT/disk-cleaner-${{ inputs.version }}-1.x86_64/usr/local/bin/disk-cleaner"
+            chmod +x "rpm/BUILDROOT/disk-cleaner-${{ inputs.version }}-1.x86_64/usr/local/bin/disk-cleaner"
+            
+            # Create spec file
+            cat > "rpm/SPECS/disk-cleaner.spec" << EOF
+        Name: disk-cleaner
+        Version: ${{ inputs.version }}
+        Release: 1
+        Summary: High-performance disk space analyzer and cleaner
+        License: MIT
+        URL: https://github.com/srcheesedev/disk-cleaner
+        
+        %description
+        A fast, cross-platform command-line tool for analyzing and cleaning disk space.
+        Built with Rust for maximum performance and memory safety.
+        
+        %files
+        /usr/local/bin/disk-cleaner
+        
+        %changelog
+        * $(date "+%a %b %d %Y") srcheesedev <dev@example.com> - ${{ inputs.version }}-1
+        - Updated to version ${{ inputs.version }}
+        EOF
+            
+            # Build RPM
+            rpmbuild --define "_topdir $(pwd)/rpm" --define "_rpmdir $(pwd)/packages" \
+                     --buildroot "$(pwd)/rpm/BUILDROOT/disk-cleaner-${{ inputs.version }}-1.x86_64" \
+                     -bb rpm/SPECS/disk-cleaner.spec
+            
+            # Move RPM to expected location
+            find packages -name "*.rpm" -exec mv {} "packages/${RPM_NAME}.rpm" \;
+            ARTIFACT_PATH="packages/${RPM_NAME}.rpm"
+            ARTIFACT_NAME="$RPM_NAME"
+            ;;
+            
+          "pkg")
+            echo "📦 Creating PKG package..."
+            if [[ "${{ runner.os }}" == "macOS" ]]; then
+              PKG_NAME="disk-cleaner-macos-v${{ inputs.version }}"
+              
+              # Create package structure
+              mkdir -p "pkg_root/usr/local/bin"
+              cp "dist/${{ inputs.project-name }}" "pkg_root/usr/local/bin/disk-cleaner"
+              chmod +x "pkg_root/usr/local/bin/disk-cleaner"
+              
+              # Build PKG
+              pkgbuild --root pkg_root \
+                       --identifier com.srcheesedev.disk-cleaner \
+                       --version ${{ inputs.version }} \
+                       --install-location / \
+                       "packages/${PKG_NAME}.pkg"
+              
+              ARTIFACT_PATH="packages/${PKG_NAME}.pkg"
+              ARTIFACT_NAME="$PKG_NAME"
+            else
+              echo "❌ PKG packages can only be built on macOS"
+              exit 1
             fi
-          done
-        fi
+            ;;
+            
+          "msi")
+            echo "📦 Creating MSI package..."
+            if [[ "${{ runner.os }}" == "Windows" ]]; then
+              MSI_NAME="disk-cleaner-windows-v${{ inputs.version }}"
+              
+              # Install WiX if not available
+              if ! command -v candle &> /dev/null; then
+                echo "Installing WiX Toolset..."
+                choco install wixtoolset -y
+                export PATH="$PATH:/c/Program Files (x86)/WiX Toolset v3.11/bin"
+              fi
+              
+              # Create WiX source file
+              cat > installer.wxs << 'EOF'
+        <?xml version="1.0" encoding="UTF-8"?>
+        <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+          <Product Id="*" Name="Disk Cleaner" Language="1033" 
+                   Version="${{ inputs.version }}" Manufacturer="srcheesedev" 
+                   UpgradeCode="12345678-1234-1234-1234-123456789012">
+            <Package InstallerVersion="200" Compressed="yes" InstallScope="perMachine" />
+            <MajorUpgrade DowngradeErrorMessage="A newer version is already installed." />
+            <MediaTemplate EmbedCab="yes" />
+            
+            <Feature Id="ProductFeature" Title="Disk Cleaner" Level="1">
+              <ComponentGroupRef Id="ProductComponents" />
+            </Feature>
+          </Product>
+          
+          <Fragment>
+            <Directory Id="TARGETDIR" Name="SourceDir">
+              <Directory Id="ProgramFilesFolder">
+                <Directory Id="INSTALLFOLDER" Name="DiskCleaner" />
+              </Directory>
+            </Directory>
+          </Fragment>
+          
+          <Fragment>
+            <ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
+              <Component Id="MainExecutable" Guid="*">
+                <File Id="DiskCleanerExe" Source="dist/${{ inputs.project-name }}.exe" KeyPath="yes" />
+              </Component>
+            </ComponentGroup>
+          </Fragment>
+        </Wix>
+        EOF
+              
+              # Build MSI
+              candle installer.wxs
+              light installer.wixobj -out "packages/${MSI_NAME}.msi"
+              
+              ARTIFACT_PATH="packages/${MSI_NAME}.msi"
+              ARTIFACT_NAME="$MSI_NAME"
+            else
+              echo "❌ MSI packages can only be built on Windows"
+              exit 1
+            fi
+            ;;
+            
+          "binary"|*)
+            echo "📦 Creating binary archive..."
+            # Create standard binary archive
+            ARTIFACT_NAME="${{ inputs.project-name }}-${{ inputs.platform }}"
+            
+            if [[ "${{ runner.os }}" == "Windows" ]]; then
+              cd dist && 7z a "../packages/${ARTIFACT_NAME}.zip" *
+              ARTIFACT_PATH="packages/${ARTIFACT_NAME}.zip"
+            else
+              cd dist && tar -czf "../packages/${ARTIFACT_NAME}.tar.gz" *
+              ARTIFACT_PATH="packages/${ARTIFACT_NAME}.tar.gz"
+            fi
+            ;;
+        esac
         
-        # Create archive
-        ARTIFACT_NAME="${{ inputs.project-name }}-${{ inputs.platform }}"
-        
-        if [[ "${{ runner.os }}" == "Windows" ]]; then
-          cd dist && 7z a "../${ARTIFACT_NAME}.zip" *
-          ARTIFACT_PATH="${ARTIFACT_NAME}.zip"
-        else
-          cd dist && tar -czf "../${ARTIFACT_NAME}.tar.gz" *
-          ARTIFACT_PATH="${ARTIFACT_NAME}.tar.gz"
-        fi
-        
-        echo "📦 Created archive: $ARTIFACT_PATH"
+        echo "📦 Created package: $ARTIFACT_PATH"
         
         # Set outputs
         echo "artifact-name=$ARTIFACT_NAME" >> $GITHUB_OUTPUT

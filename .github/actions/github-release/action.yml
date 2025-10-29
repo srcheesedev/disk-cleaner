@@ -37,13 +37,9 @@ runs:
       shell: bash
       run: |
         mkdir -p release-files
+        # Copy only the files that are actually generated
         find artifacts -name "*.tar.gz" -exec cp {} release-files/ \;
         find artifacts -name "*.zip" -exec cp {} release-files/ \;
-        find artifacts -name "*.deb" -exec cp {} release-files/ \;
-        find artifacts -name "*.rpm" -exec cp {} release-files/ \;
-        find artifacts -name "*.pkg" -exec cp {} release-files/ \;
-        find artifacts -name "*.msi" -exec cp {} release-files/ \;
-        find artifacts -name "checksums.txt" -exec cp {} release-files/ \;
         echo "📦 Release files prepared:"
         ls -la release-files/
 

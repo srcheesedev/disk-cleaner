@@ -1,0 +1,97 @@
+# AUR PKGBUILD for Arch Linux
+# Maintainer: srcheesedev <noreply@github.com>
+
+pkgname=disk-cleaner
+pkgver=0.2.0
+pkgrel=1
+pkgdesc="Lightning-fast disk space analyzer and cleanup tool built with Rust"
+arch=('x86_64')
+url="https://github.com/srcheesedev/disk-cleaner"
+license=('MIT')
+depends=('gcc-libs')
+makedepends=('rust' 'cargo')
+source=("$pkgname-$pkgver.tar.gz::https://github.com/srcheesedev/disk-cleaner/archive/v$pkgver.tar.gz")
+sha256sums=('PLACEHOLDER_SOURCE_SHA256')
+
+build() {
+    cd "$pkgname-$pkgver"
+    cargo build --release --locked
+}
+
+check() {
+    cd "$pkgname-$pkgver"
+    cargo test --release --locked
+}
+
+package() {
+    cd "$pkgname-$pkgver"
+    
+    # Install binary
+    install -Dm755 "target/release/disk-cleaner-rs" "$pkgdir/usr/bin/disk-cleaner"
+    
+    # Install license
+    install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+    
+    # Install documentation
+    install -Dm644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
+    install -Dm644 CHANGELOG.md "$pkgdir/usr/share/doc/$pkgname/CHANGELOG.md"
+    
+    # Generate and install man page
+    mkdir -p "$pkgdir/usr/share/man/man1"
+    cat > "$pkgdir/usr/share/man/man1/disk-cleaner.1" << 'EOF'
+.TH DISK-CLEANER 1 "October 2025" "v0.2.0" "User Commands"
+.SH NAME
+disk-cleaner \- lightning-fast disk space analyzer and cleanup tool
+.SH SYNOPSIS
+.B disk-cleaner
+[\fIOPTIONS\fR] [\fIDIRECTORY\fR]
+.SH DESCRIPTION
+A high-performance disk space analyzer built with Rust that helps you find space hogs and clean up clutter with confidence.
+.SH OPTIONS
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help information
+.TP
+\fB\-V\fR, \fB\-\-version\fR
+Print version information
+.TP
+\fB\-d\fR, \fB\-\-depth\fR \fIDEPTH\fR
+Maximum depth to scan
+.TP
+\fB\-\-min\-size\fR \fISIZE\fR
+Minimum file size to display
+.TP
+\fB\-\-dirs\-only\fR
+Show only directories
+.TP
+\fB\-\-files\-only\fR
+Show only files
+.SH EXAMPLES
+.TP
+Analyze current directory:
+\fBdisk-cleaner\fR
+.TP
+Analyze with depth limit:
+\fBdisk-cleaner -d 3 /home/user\fR
+.TP
+Show only large files:
+\fBdisk-cleaner --min-size 1GB --files-only\fR
+.SH AUTHOR
+Written by srcheesedev.
+.SH REPORTING BUGS
+Report bugs at: https://github.com/srcheesedev/disk-cleaner/issues
+EOF
+    
+    # Install shell completions if available
+    if [ -f "completions/disk-cleaner.bash" ]; then
+        install -Dm644 "completions/disk-cleaner.bash" "$pkgdir/usr/share/bash-completion/completions/disk-cleaner"
+    fi
+    
+    if [ -f "completions/disk-cleaner.zsh" ]; then
+        install -Dm644 "completions/disk-cleaner.zsh" "$pkgdir/usr/share/zsh/site-functions/_disk-cleaner"
+    fi
+    
+    if [ -f "completions/disk-cleaner.fish" ]; then
+        install -Dm644 "completions/disk-cleaner.fish" "$pkgdir/usr/share/fish/vendor_completions.d/disk-cleaner.fish"
+    fi
+}

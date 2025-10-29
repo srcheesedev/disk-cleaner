@@ -5,6 +5,10 @@ inputs:
   version:
     description: 'Version to release'
     required: true
+  changelog:
+    description: 'Changelog content for this release'
+    required: false
+    default: ''
   token:
     description: 'GitHub token'
     required: true
@@ -43,36 +47,81 @@ runs:
         mkdir -p release-files
         find artifacts -name "*.tar.gz" -exec cp {} release-files/ \;
         find artifacts -name "*.zip" -exec cp {} release-files/ \;
+        find artifacts -name "*.deb" -exec cp {} release-files/ \;
+        find artifacts -name "*.rpm" -exec cp {} release-files/ \;
+        find artifacts -name "*.pkg" -exec cp {} release-files/ \;
+        find artifacts -name "*.msi" -exec cp {} release-files/ \;
+        find artifacts -name "checksums.txt" -exec cp {} release-files/ \;
         echo "📦 Release files prepared:"
         ls -la release-files/
 
-    - name: Generate changelog
+    - name: Generate release notes
       shell: bash
       run: |
         VERSION="v${{ inputs.version }}"
         TODAY=$(date +%Y-%m-%d)
         
-        echo "# Release $VERSION" > release_notes.md
-        echo "" >> release_notes.md
-        echo "Released on $TODAY" >> release_notes.md
-        echo "" >> release_notes.md
-        echo "## Changes" >> release_notes.md
-        echo "" >> release_notes.md
+        cat > release_notes.md << EOF
+        ## 🧹 Disk Cleaner $VERSION
         
-        # Get commits since last tag
-        if git describe --tags --abbrev=0 HEAD~1 >/dev/null 2>&1; then
-          LAST_TAG=$(git describe --tags --abbrev=0 HEAD~1)
-          echo "Changes since $LAST_TAG:" >> release_notes.md
-          echo "" >> release_notes.md
-          git log --pretty=format:"- %s" $LAST_TAG..HEAD --no-merges >> release_notes.md
+        **Lightning-fast disk space analyzer and cleanup tool built with Rust** ⚡
+        
+        Released on $TODAY
+        
+        EOF
+        
+        # Add changelog content if provided
+        if [ -n "${{ inputs.changelog }}" ]; then
+          echo "${{ inputs.changelog }}" >> release_notes.md
         else
-          echo "Initial release" >> release_notes.md
+          echo "### Changes" >> release_notes.md
           echo "" >> release_notes.md
-          git log --pretty=format:"- %s" --no-merges --max-count=20 >> release_notes.md
+          
+          # Get commits since last tag
+          if git describe --tags --abbrev=0 HEAD~1 >/dev/null 2>&1; then
+            LAST_TAG=$(git describe --tags --abbrev=0 HEAD~1)
+            echo "Changes since $LAST_TAG:" >> release_notes.md
+            echo "" >> release_notes.md
+            git log --pretty=format:"- %s" $LAST_TAG..HEAD --no-merges >> release_notes.md
+          else
+            echo "- Initial release" >> release_notes.md
+          fi
         fi
         
-        echo "" >> release_notes.md
-        echo "🎯 **Download the appropriate binary for your platform above**" >> release_notes.md
+        cat >> release_notes.md << 'EOF'
+        
+        ### 📥 Installation Options
+        
+        | Platform | Installer Type | Download |
+        |----------|---------------|----------|
+        | 🍎 macOS | PKG Installer | `disk-cleaner-macos-v${{ inputs.version }}.pkg` |
+        | 🪟 Windows | MSI Installer | `disk-cleaner-windows-v${{ inputs.version }}.msi` |
+        | 🐧 Linux | DEB Package | `disk-cleaner_${{ inputs.version }}_amd64.deb` |
+        | 🐧 Linux | RPM Package | `disk-cleaner-${{ inputs.version }}-1.x86_64.rpm` |
+        | 📦 Manual | Raw Binaries | Platform-specific archives below |
+        
+        ### 🚀 Quick Install
+        ```bash
+        # macOS
+        curl -L -O https://github.com/${{ github.repository }}/releases/download/v${{ inputs.version }}/disk-cleaner-macos-v${{ inputs.version }}.pkg
+        sudo installer -pkg disk-cleaner-macos-v${{ inputs.version }}.pkg -target /
+        
+        # Ubuntu/Debian
+        curl -L -O https://github.com/${{ github.repository }}/releases/download/v${{ inputs.version }}/disk-cleaner_${{ inputs.version }}_amd64.deb
+        sudo dpkg -i disk-cleaner_${{ inputs.version }}_amd64.deb
+        
+        # RHEL/Fedora/CentOS
+        curl -L -O https://github.com/${{ github.repository }}/releases/download/v${{ inputs.version }}/disk-cleaner-${{ inputs.version }}-1.x86_64.rpm
+        sudo rpm -i disk-cleaner-${{ inputs.version }}-1.x86_64.rpm
+        
+        # Windows (PowerShell as Administrator)
+        Invoke-WebRequest -Uri "https://github.com/${{ github.repository }}/releases/download/v${{ inputs.version }}/disk-cleaner-windows-v${{ inputs.version }}.msi" -OutFile "disk-cleaner.msi"
+        Start-Process msiexec.exe -ArgumentList "/i disk-cleaner.msi /quiet" -Wait
+        ```
+        
+        ### 🔍 Checksums
+        See `checksums.txt` for file verification.
+        EOF
 
     - name: Create GitHub Release
       id: create-release

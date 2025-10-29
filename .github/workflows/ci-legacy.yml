@@ -1,0 +1,33 @@
+name: 'CI/CD Pipeline (Legacy)'
+
+# This workflow is kept for compatibility
+# The optimized workflow is in optimized-ci.yml
+
+on:
+  workflow_dispatch:
+    inputs:
+      force_run:
+        description: 'Force run legacy CI'
+        required: false
+        default: 'false'
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  legacy-notice:
+    name: 'Legacy CI Notice'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notice
+        run: |
+          echo "🔄 This is the legacy CI workflow"
+          echo "📝 The optimized workflow is now in optimized-ci.yml"
+          echo "⚡ New workflow features:"
+          echo "   - Parallel testing stages"
+          echo "   - Optimized caching"
+          echo "   - Parallel package creation"
+          echo "   - Automated changelog generation"

@@ -41,8 +41,7 @@ fn create_integration_test_structure() -> Result<TempDir, Box<dyn std::error::Er
 /// Helper function to create a command for the binary
 fn get_test_command() -> Command {
     // Use the modern way to get cargo binary command
-    let cmd = Command::new(env!("CARGO_BIN_EXE_disk-cleaner-rs"));
-    cmd
+    Command::new(env!("CARGO_BIN_EXE_disk-cleaner-rs"))
 }
 
 #[test]

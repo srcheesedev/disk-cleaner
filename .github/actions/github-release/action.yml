@@ -82,37 +82,17 @@ runs:
         
         cat >> release_notes.md << 'EOF'
         
-        ### 📥 Installation Options
+        ### � Downloads
         
-        | Platform | Installer Type | Download |
-        |----------|---------------|----------|
-        | 🍎 macOS | PKG Installer | `disk-cleaner-macos-v${{ inputs.version }}.pkg` |
-        | 🪟 Windows | MSI Installer | `disk-cleaner-windows-v${{ inputs.version }}.msi` |
-        | 🐧 Linux | DEB Package | `disk-cleaner_${{ inputs.version }}_amd64.deb` |
-        | 🐧 Linux | RPM Package | `disk-cleaner-${{ inputs.version }}-1.x86_64.rpm` |
-        | 📦 Manual | Raw Binaries | Platform-specific archives below |
+        Choose the appropriate binary for your platform:
         
-        ### 🚀 Quick Install
-        ```bash
-        # macOS
-        curl -L -O https://github.com/${{ github.repository }}/releases/download/v${{ inputs.version }}/disk-cleaner-macos-v${{ inputs.version }}.pkg
-        sudo installer -pkg disk-cleaner-macos-v${{ inputs.version }}.pkg -target /
+        - **Linux x64**: `disk-cleaner-rs-linux-x64.tar.gz`
+        - **Linux musl**: `disk-cleaner-rs-linux-musl.tar.gz` (static binary)
+        - **macOS x64**: `disk-cleaner-rs-macos-x64.tar.gz`
+        - **macOS ARM64**: `disk-cleaner-rs-macos-arm64.tar.gz`
+        - **Windows x64**: `disk-cleaner-rs-windows-x64.zip`
         
-        # Ubuntu/Debian
-        curl -L -O https://github.com/${{ github.repository }}/releases/download/v${{ inputs.version }}/disk-cleaner_${{ inputs.version }}_amd64.deb
-        sudo dpkg -i disk-cleaner_${{ inputs.version }}_amd64.deb
-        
-        # RHEL/Fedora/CentOS
-        curl -L -O https://github.com/${{ github.repository }}/releases/download/v${{ inputs.version }}/disk-cleaner-${{ inputs.version }}-1.x86_64.rpm
-        sudo rpm -i disk-cleaner-${{ inputs.version }}-1.x86_64.rpm
-        
-        # Windows (PowerShell as Administrator)
-        Invoke-WebRequest -Uri "https://github.com/${{ github.repository }}/releases/download/v${{ inputs.version }}/disk-cleaner-windows-v${{ inputs.version }}.msi" -OutFile "disk-cleaner.msi"
-        Start-Process msiexec.exe -ArgumentList "/i disk-cleaner.msi /quiet" -Wait
-        ```
-        
-        ### 🔍 Checksums
-        See `checksums.txt` for file verification.
+        All binaries are optimized for performance and include safety checks.
         EOF
 
     - name: Create GitHub Release

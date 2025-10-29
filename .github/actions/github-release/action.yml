@@ -141,20 +141,4 @@ runs:
         fi
         
         mv CHANGELOG_NEW.md CHANGELOG.md
-        echo "✅ Updated CHANGELOG.md"
-
-    - name: Setup Git and commit changelog
-      uses: ./.github/actions/setup-git
-
-    - name: Commit updated changelog
-      shell: bash
-      run: |
-        echo "📝 Committing updated changelog..."
-        git add CHANGELOG.md
-        if git diff --staged --quiet; then
-          echo "ℹ️ No changes to commit"
-        else
-          git commit -m "docs: update changelog for v${{ inputs.version }} [skip ci]"
-          git push origin HEAD
-          echo "✅ Pushed updated changelog"
-        fi
+        echo "✅ Updated CHANGELOG.md (for release notes only)"

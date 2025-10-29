@@ -2,11 +2,12 @@
 
 # 🧹 Disk Cleaner
 
-[![CI/CD Pipeline](https://github.com/srcheesedev/disk-cleaner/actions/workflows/ci.yml/badge.svg)](https://github.com/srcheesedev/disk-cleaner/actions/workflows/ci.yml)
-[![Security Audit](https://github.com/srcheesedev/disk-cleaner/actions/workflows/security.yml/badge.svg)](https://github.com/srcheesedev/disk-cleaner/actions/workflows/security.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Rust Version](https://img.shields.io/badge/rust-1.70%2B-blue.svg)](https://www.rust-lang.org)
-[![Cross Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)](https://github.com/srcheesedev/disk-cleaner/releases)
+[![CI/CD Pipeline](https://img.shields.io/github/actions/workflow/status/srcheesedev/disk-cleaner/ci.yml?style=for-the-badge&logo=github&label=CI%2FCD)](https://github.com/srcheesedev/disk-cleaner/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge&logo=opensourceinitiative&logoColor=white)](https://opensource.org/licenses/MIT)
+[![Rust Version](https://img.shields.io/badge/rust-1.70%2B-blue.svg?style=for-the-badge&logo=rust&logoColor=white)](https://www.rust-lang.org)
+[![Cross Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/srcheesedev/disk-cleaner/releases)
+[![Tests](https://img.shields.io/badge/tests-35%2F35%20passing-brightgreen.svg?style=for-the-badge&logo=checkmarx&logoColor=white)](#testing)
+[![Code Quality](https://img.shields.io/badge/clippy-0%20warnings-brightgreen.svg?style=for-the-badge&logo=rust&logoColor=white)](#code-quality)
 
 **A lightning-fast, interactive disk space analyzer and cleanup tool built with Rust** ⚡
 

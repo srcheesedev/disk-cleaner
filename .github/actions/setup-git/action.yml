@@ -1,0 +1,22 @@
+name: 'Setup Git Configuration'
+description: 'Configures Git user for automated commits'
+
+inputs:
+  user-name:
+    description: 'Git user name'
+    required: false
+    default: 'Release Bot'
+  user-email:
+    description: 'Git user email'
+    required: false
+    default: 'noreply@github.com'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Configure Git
+      shell: bash
+      run: |
+        git config --local user.email "${{ inputs.user-email }}"
+        git config --local user.name "${{ inputs.user-name }}"
+        echo "✅ Git configured as: ${{ inputs.user-name }} <${{ inputs.user-email }}>"

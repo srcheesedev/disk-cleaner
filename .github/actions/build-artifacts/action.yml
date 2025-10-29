@@ -1,0 +1,111 @@
+name: 'Build Release Artifacts'
+description: 'Builds and packages artifacts for multiple platforms'
+
+inputs:
+  version:
+    description: 'Version to build'
+    required: true
+  target:
+    description: 'Target architecture'
+    required: true
+  platform:
+    description: 'Platform name for artifact'
+    required: true
+  project-name:
+    description: 'Project binary name'
+    required: false
+    default: 'disk-cleaner-rs'
+  include-files:
+    description: 'Additional files to include (space-separated)'
+    required: false
+    default: 'README.md LICENSE'
+  include-scripts:
+    description: 'Scripts to include on Unix platforms'
+    required: false
+    default: 'install.sh'
+
+outputs:
+  artifact-name:
+    description: 'Name of created artifact'
+    value: ${{ steps.package.outputs.artifact-name }}
+  artifact-path:
+    description: 'Path to created artifact'
+    value: ${{ steps.package.outputs.artifact-path }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup Rust environment
+      uses: ./.github/actions/setup-rust
+      with:
+        targets: ${{ inputs.target }}
+        cache-key-suffix: 'release-${{ inputs.platform }}'
+
+    - name: Build release binary
+      shell: bash
+      run: |
+        echo "🏗️ Building for target: ${{ inputs.target }}"
+        cargo build --release --target ${{ inputs.target }}
+        echo "✅ Build completed"
+
+    - name: Package artifacts
+      id: package
+      shell: bash
+      run: |
+        mkdir -p dist
+        
+        # Determine file extension
+        if [[ "${{ runner.os }}" == "Windows" ]]; then
+          SUFFIX=".exe"
+          ARCHIVE_EXT="zip"
+        else
+          SUFFIX=""
+          ARCHIVE_EXT="tar.gz"
+        fi
+        
+        # Copy binary
+        cp "target/${{ inputs.target }}/release/${{ inputs.project-name }}${SUFFIX}" dist/
+        echo "📦 Copied binary: ${{ inputs.project-name }}${SUFFIX}"
+        
+        # Copy additional files
+        for file in ${{ inputs.include-files }}; do
+          if [ -f "$file" ]; then
+            cp "$file" dist/
+            echo "📄 Included: $file"
+          fi
+        done
+        
+        # Copy scripts (Unix only)
+        if [[ "${{ runner.os }}" != "Windows" ]]; then
+          for script in ${{ inputs.include-scripts }}; do
+            if [ -f "$script" ]; then
+              cp "$script" dist/
+              chmod +x "dist/$script"
+              echo "📜 Included script: $script"
+            fi
+          done
+        fi
+        
+        # Create archive
+        ARTIFACT_NAME="${{ inputs.project-name }}-${{ inputs.platform }}"
+        
+        if [[ "${{ runner.os }}" == "Windows" ]]; then
+          cd dist && 7z a "../${ARTIFACT_NAME}.zip" *
+          ARTIFACT_PATH="${ARTIFACT_NAME}.zip"
+        else
+          cd dist && tar -czf "../${ARTIFACT_NAME}.tar.gz" *
+          ARTIFACT_PATH="${ARTIFACT_NAME}.tar.gz"
+        fi
+        
+        echo "📦 Created archive: $ARTIFACT_PATH"
+        
+        # Set outputs
+        echo "artifact-name=$ARTIFACT_NAME" >> $GITHUB_OUTPUT
+        echo "artifact-path=$ARTIFACT_PATH" >> $GITHUB_OUTPUT
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ steps.package.outputs.artifact-name }}
+        path: ${{ steps.package.outputs.artifact-path }}
+        if-no-files-found: error

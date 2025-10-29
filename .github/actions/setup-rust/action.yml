@@ -1,0 +1,82 @@
+name: 'Setup Rust Environment'
+description: 'Sets up Rust toolchain with caching and optional components'
+
+inputs:
+  toolchain:
+    description: 'Rust toolchain version'
+    required: false
+    default: 'stable'
+  components:
+    description: 'Additional components to install (comma-separated)'
+    required: false
+    default: 'rustfmt,clippy'
+  targets:
+    description: 'Target architectures to install (comma-separated)'
+    required: false
+    default: ''
+  cache-key-suffix:
+    description: 'Additional suffix for cache key'
+    required: false
+    default: 'default'
+  install-cargo-audit:
+    description: 'Whether to install cargo-audit'
+    required: false
+    default: 'false'
+
+outputs:
+  cache-hit:
+    description: 'Whether cache was hit'
+    value: ${{ steps.cache.outputs.cache-hit }}
+  rust-version:
+    description: 'Installed Rust version'
+    value: ${{ steps.rust-info.outputs.version }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        toolchain: ${{ inputs.toolchain }}
+        components: ${{ inputs.components }}
+        targets: ${{ inputs.targets }}
+
+    - name: Get Rust info
+      id: rust-info
+      shell: bash
+      run: |
+        echo "version=$(rustc --version)" >> $GITHUB_OUTPUT
+        echo "🦀 Rust version: $(rustc --version)"
+
+    - name: Setup cargo cache
+      id: cache
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-cargo-${{ inputs.cache-key-suffix }}-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-${{ inputs.cache-key-suffix }}-
+          ${{ runner.os }}-cargo-
+
+    - name: Install cargo-audit
+      if: inputs.install-cargo-audit == 'true'
+      shell: bash
+      run: |
+        if ! command -v cargo-audit &> /dev/null; then
+          echo "📦 Installing cargo-audit..."
+          cargo install cargo-audit
+        else
+          echo "✅ cargo-audit already installed"
+        fi
+
+    - name: Cache info
+      shell: bash
+      run: |
+        if [ "${{ steps.cache.outputs.cache-hit }}" = "true" ]; then
+          echo "🎯 Cache hit! Dependencies restored from cache"
+        else
+          echo "📦 Cache miss. Dependencies will be cached for next run"
+        fi

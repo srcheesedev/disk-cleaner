@@ -288,7 +288,7 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 
 <div align="center">
 
-**Made with ❤️ and ⚡ Rust**
+**Made with 🧀 and 🍺 Rust**
 
 [⭐ Star us on GitHub](https://github.com/srcheesedev/disk-cleaner) • [📥 Download Latest Release](https://github.com/srcheesedev/disk-cleaner/releases) • [🐛 Report Issues](https://github.com/srcheesedev/disk-cleaner/issues)
 

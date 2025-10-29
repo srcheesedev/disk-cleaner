@@ -1,0 +1,150 @@
+name: 'Automatic Semantic Versioning'
+description: 'Analyzes commits, bumps version, creates tag'
+
+inputs:
+  base-branch:
+    description: 'Base branch to compare against'
+    required: false
+    default: 'main'
+  head-branch:
+    description: 'Head branch to analyze'
+    required: false
+    default: 'develop'
+  version-file:
+    description: 'File containing version (Cargo.toml, package.json, etc)'
+    required: false
+    default: 'Cargo.toml'
+  version-pattern:
+    description: 'Regex pattern to find version'
+    required: false
+    default: '^version = "([^"]*)"'
+  token:
+    description: 'GitHub token for operations'
+    required: true
+
+outputs:
+  old-version:
+    description: 'Previous version'
+    value: ${{ steps.version-info.outputs.old-version }}
+  new-version:
+    description: 'New calculated version'
+    value: ${{ steps.version-info.outputs.new-version }}
+  version-created:
+    description: 'Whether new version was created'
+    value: ${{ steps.version-info.outputs.created }}
+  bump-type:
+    description: 'Type of version bump (major/minor/patch)'
+    value: ${{ steps.analyze.outputs.bump-type }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup Git configuration
+      uses: ./.github/actions/setup-git
+      
+    - name: Get current version
+      id: current-version
+      shell: bash
+      run: |
+        if [ "${{ inputs.version-file }}" = "Cargo.toml" ]; then
+          CURRENT=$(grep '^version = ' Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+        elif [ "${{ inputs.version-file }}" = "package.json" ]; then
+          CURRENT=$(grep '"version":' package.json | sed 's/.*"version": *"\([^"]*\)".*/\1/')
+        else
+          CURRENT=$(grep -E "${{ inputs.version-pattern }}" "${{ inputs.version-file }}" | sed -E 's/${{ inputs.version-pattern }}/\1/')
+        fi
+        echo "current=$CURRENT" >> $GITHUB_OUTPUT
+        echo "📦 Current version: $CURRENT"
+
+    - name: Analyze commits for version bump
+      id: analyze
+      shell: bash
+      run: |
+        echo "🔍 Analyzing commits between ${{ inputs.base-branch }} and ${{ inputs.head-branch }}..."
+        
+        # Get commits that are in head but not in base
+        COMMITS=$(git log origin/${{ inputs.base-branch }}..origin/${{ inputs.head-branch }} --pretty=format:"%s" --no-merges)
+        
+        echo "📝 Commits to analyze:"
+        echo "$COMMITS"
+        
+        # Determine version bump based on conventional commits
+        BUMP_TYPE="patch"
+        
+        # Check for breaking changes (major)
+        if echo "$COMMITS" | grep -qE "(feat|fix|refactor|perf)(\(.+\))?!:|BREAKING CHANGE"; then
+          BUMP_TYPE="major"
+          echo "🚨 MAJOR bump detected (breaking changes)"
+        # Check for new features (minor)  
+        elif echo "$COMMITS" | grep -qE "^feat(\(.+\))?:"; then
+          BUMP_TYPE="minor"
+          echo "✨ MINOR bump detected (new features)"
+        # Default to patch for fixes, docs, etc.
+        else
+          echo "🔧 PATCH bump detected (fixes/improvements)"
+        fi
+        
+        echo "bump-type=$BUMP_TYPE" >> $GITHUB_OUTPUT
+
+    - name: Calculate and apply new version
+      id: version-info
+      shell: bash
+      run: |
+        CURRENT="${{ steps.current-version.outputs.current }}"
+        BUMP="${{ steps.analyze.outputs.bump-type }}"
+        
+        echo "📊 Current: $CURRENT, Bump: $BUMP"
+        
+        # Parse semantic version
+        if [[ $CURRENT =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+          MAJOR=${BASH_REMATCH[1]}
+          MINOR=${BASH_REMATCH[2]}
+          PATCH=${BASH_REMATCH[3]}
+        else
+          echo "❌ Invalid version format: $CURRENT"
+          exit 1
+        fi
+        
+        # Bump version according to type
+        case $BUMP in
+          major)
+            MAJOR=$((MAJOR + 1))
+            MINOR=0
+            PATCH=0
+            ;;
+          minor)
+            MINOR=$((MINOR + 1))
+            PATCH=0
+            ;;
+          patch)
+            PATCH=$((PATCH + 1))
+            ;;
+        esac
+        
+        NEW_VERSION="$MAJOR.$MINOR.$PATCH"
+        echo "🎯 New version: $NEW_VERSION"
+        
+        # Update version in file
+        if [ "${{ inputs.version-file }}" = "Cargo.toml" ]; then
+          sed -i "s/^version = \".*\"/version = \"$NEW_VERSION\"/" Cargo.toml
+        elif [ "${{ inputs.version-file }}" = "package.json" ]; then
+          sed -i "s/\"version\": *\"[^\"]*\"/\"version\": \"$NEW_VERSION\"/" package.json
+        fi
+        
+        echo "✅ Updated ${{ inputs.version-file }} to version $NEW_VERSION"
+        
+        # Create git tag
+        git add "${{ inputs.version-file }}"
+        git commit -m "chore: bump version to $NEW_VERSION"
+        git tag "v$NEW_VERSION"
+        echo "🏷️ Created tag v$NEW_VERSION"
+        
+        # Push changes
+        git push origin ${{ inputs.head-branch }}
+        git push origin "v$NEW_VERSION"
+        echo "✅ Pushed version and tag"
+        
+        # Set outputs
+        echo "old-version=$CURRENT" >> $GITHUB_OUTPUT
+        echo "new-version=$NEW_VERSION" >> $GITHUB_OUTPUT
+        echo "created=true" >> $GITHUB_OUTPUT

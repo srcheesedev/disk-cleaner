@@ -12,14 +12,6 @@ inputs:
   token:
     description: 'GitHub token'
     required: true
-  main-branch:
-    description: 'Main branch name'
-    required: false
-    default: 'main'
-  develop-branch:
-    description: 'Development branch name'
-    required: false
-    default: 'develop'
   prerelease:
     description: 'Mark as prerelease'
     required: false
@@ -45,13 +37,9 @@ runs:
       shell: bash
       run: |
         mkdir -p release-files
+        # Copy only the files that are actually generated
         find artifacts -name "*.tar.gz" -exec cp {} release-files/ \;
         find artifacts -name "*.zip" -exec cp {} release-files/ \;
-        find artifacts -name "*.deb" -exec cp {} release-files/ \;
-        find artifacts -name "*.rpm" -exec cp {} release-files/ \;
-        find artifacts -name "*.pkg" -exec cp {} release-files/ \;
-        find artifacts -name "*.msi" -exec cp {} release-files/ \;
-        find artifacts -name "checksums.txt" -exec cp {} release-files/ \;
         echo "📦 Release files prepared:"
         ls -la release-files/
 
@@ -90,37 +78,17 @@ runs:
         
         cat >> release_notes.md << 'EOF'
         
-        ### 📥 Installation Options
+        ### � Downloads
         
-        | Platform | Installer Type | Download |
-        |----------|---------------|----------|
-        | 🍎 macOS | PKG Installer | `disk-cleaner-macos-v${{ inputs.version }}.pkg` |
-        | 🪟 Windows | MSI Installer | `disk-cleaner-windows-v${{ inputs.version }}.msi` |
-        | 🐧 Linux | DEB Package | `disk-cleaner_${{ inputs.version }}_amd64.deb` |
-        | 🐧 Linux | RPM Package | `disk-cleaner-${{ inputs.version }}-1.x86_64.rpm` |
-        | 📦 Manual | Raw Binaries | Platform-specific archives below |
+        Choose the appropriate binary for your platform:
         
-        ### 🚀 Quick Install
-        ```bash
-        # macOS
-        curl -L -O https://github.com/${{ github.repository }}/releases/download/v${{ inputs.version }}/disk-cleaner-macos-v${{ inputs.version }}.pkg
-        sudo installer -pkg disk-cleaner-macos-v${{ inputs.version }}.pkg -target /
+        - **Linux x64**: `disk-cleaner-rs-linux-x64.tar.gz`
+        - **Linux musl**: `disk-cleaner-rs-linux-musl.tar.gz` (static binary)
+        - **macOS x64**: `disk-cleaner-rs-macos-x64.tar.gz`
+        - **macOS ARM64**: `disk-cleaner-rs-macos-arm64.tar.gz`
+        - **Windows x64**: `disk-cleaner-rs-windows-x64.zip`
         
-        # Ubuntu/Debian
-        curl -L -O https://github.com/${{ github.repository }}/releases/download/v${{ inputs.version }}/disk-cleaner_${{ inputs.version }}_amd64.deb
-        sudo dpkg -i disk-cleaner_${{ inputs.version }}_amd64.deb
-        
-        # RHEL/Fedora/CentOS
-        curl -L -O https://github.com/${{ github.repository }}/releases/download/v${{ inputs.version }}/disk-cleaner-${{ inputs.version }}-1.x86_64.rpm
-        sudo rpm -i disk-cleaner-${{ inputs.version }}-1.x86_64.rpm
-        
-        # Windows (PowerShell as Administrator)
-        Invoke-WebRequest -Uri "https://github.com/${{ github.repository }}/releases/download/v${{ inputs.version }}/disk-cleaner-windows-v${{ inputs.version }}.msi" -OutFile "disk-cleaner.msi"
-        Start-Process msiexec.exe -ArgumentList "/i disk-cleaner.msi /quiet" -Wait
-        ```
-        
-        ### 🔍 Checksums
-        See `checksums.txt` for file verification.
+        All binaries are optimized for performance and include safety checks.
         EOF
 
     - name: Create GitHub Release
@@ -133,7 +101,6 @@ runs:
         files: release-files/*
         draft: false
         prerelease: ${{ inputs.prerelease }}
-        make_latest: true
       env:
         GITHUB_TOKEN: ${{ inputs.token }}
 
@@ -170,30 +137,4 @@ runs:
         fi
         
         mv CHANGELOG_NEW.md CHANGELOG.md
-        echo "✅ Updated CHANGELOG.md"
-
-    - name: Setup Git and sync branches
-      uses: ./.github/actions/setup-git
-
-    - name: Sync changelog to main branch
-      shell: bash
-      run: |
-        echo "🔄 Syncing changelog to ${{ inputs.main-branch }}..."
-        git checkout ${{ inputs.main-branch }}
-        git add CHANGELOG.md
-        if git diff --staged --quiet; then
-          echo "ℹ️ No changes to commit"
-        else
-          git commit -m "docs: update changelog for v${{ inputs.version }} [skip ci]"
-          git push origin ${{ inputs.main-branch }}
-          echo "✅ Pushed changelog to ${{ inputs.main-branch }}"
-        fi
-
-    - name: Sync changelog to develop branch
-      shell: bash
-      run: |
-        echo "🔄 Syncing changelog to ${{ inputs.develop-branch }}..."
-        git checkout ${{ inputs.develop-branch }}
-        git merge ${{ inputs.main-branch }} --no-ff -m "docs: sync changelog from ${{ inputs.main-branch }} [skip ci]"
-        git push origin ${{ inputs.develop-branch }}
-        echo "✅ Synced changelog to ${{ inputs.develop-branch }}"
+        echo "✅ Updated CHANGELOG.md (for release notes only)"

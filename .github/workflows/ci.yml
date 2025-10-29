@@ -4,8 +4,15 @@ on:
   push:
     branches: [ main, develop ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, develop ]
     types: [ opened, synchronize, reopened ]
+
+# Cancel previous runs when a new commit is pushed to the same ref
+# For PRs, cancel when new commits are pushed to the same PR
+# For push, cancel when new commits are pushed to the same branch
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: write
@@ -22,6 +29,7 @@ env:
 jobs:
   # ================================================================
   # STAGE 1: ENVIRONMENT SETUP
+  # Release strategy: Only on PR develop → main (not direct pushes)
   # ================================================================
   setup:
     name: 'Setup Environment'
@@ -38,10 +46,13 @@ jobs:
       - name: Check if should release
         id: check-release
         run: |
+          # Only release on PR from develop to main, not on direct pushes
           if [[ "${{ github.event_name }}" == "pull_request" && "${{ github.base_ref }}" == "main" && "${{ github.head_ref }}" == "develop" ]]; then
             echo "should-release=true" >> $GITHUB_OUTPUT
+            echo "✅ Release enabled for PR develop → main"
           else
             echo "should-release=false" >> $GITHUB_OUTPUT
+            echo "ℹ️ Release disabled - event: ${{ github.event_name }}, base: ${{ github.base_ref }}, head: ${{ github.head_ref }}"
           fi
 
       - name: Setup Rust environment
@@ -345,6 +356,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
+          fetch-depth: 0
           ref: "v${{ needs.auto-version.outputs.new-version }}"
 
       - name: Create GitHub Release

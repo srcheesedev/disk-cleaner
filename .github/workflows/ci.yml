@@ -260,27 +260,35 @@ jobs:
   build-artifacts:
     name: 'Build Artifacts'
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
+    timeout-minutes: 25
     needs: [auto-version]
     if: needs.auto-version.outputs.version-created == 'true'
     strategy:
       matrix:
         include:
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-            platform: "linux-x64"
+          # Universal Linux binary (static, works everywhere)
           - os: ubuntu-latest
             target: x86_64-unknown-linux-musl
             platform: "linux-musl"
-          - os: windows-latest
-            target: x86_64-pc-windows-msvc
-            platform: "windows-x64"
+            package-type: "binary"
+          
+          # Native packages for distribution
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            platform: "linux-x64"
+            package-type: "deb"
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            platform: "linux-x64"
+            package-type: "rpm"
           - os: macos-latest
             target: x86_64-apple-darwin
             platform: "macos-x64"
-          - os: macos-latest
-            target: aarch64-apple-darwin
-            platform: "macos-arm64"
+            package-type: "pkg"
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            platform: "windows-x64"
+            package-type: "msi"
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -293,6 +301,7 @@ jobs:
           version: ${{ needs.auto-version.outputs.new-version }}
           target: ${{ matrix.target }}
           platform: ${{ matrix.platform }}
+          package-type: ${{ matrix.package-type }}
 
   generate-changelog:
     name: 'Generate Changelog'

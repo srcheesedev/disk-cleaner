@@ -29,7 +29,7 @@ env:
 jobs:
   # ================================================================
   # STAGE 1: ENVIRONMENT SETUP
-  # Release strategy: Only on direct push to main/develop (not PRs)
+  # Release strategy: Only on PR develop → main (not direct pushes)
   # ================================================================
   setup:
     name: 'Setup Environment'
@@ -46,13 +46,13 @@ jobs:
       - name: Check if should release
         id: check-release
         run: |
-          # Only release on direct push to main or develop, not on PRs
-          if [[ "${{ github.event_name }}" == "push" && ("${{ github.ref }}" == "refs/heads/main" || "${{ github.ref }}" == "refs/heads/develop") ]]; then
+          # Only release on PR from develop to main, not on direct pushes
+          if [[ "${{ github.event_name }}" == "pull_request" && "${{ github.base_ref }}" == "main" && "${{ github.head_ref }}" == "develop" ]]; then
             echo "should-release=true" >> $GITHUB_OUTPUT
-            echo "✅ Release enabled for push to ${{ github.ref }}"
+            echo "✅ Release enabled for PR develop → main"
           else
             echo "should-release=false" >> $GITHUB_OUTPUT
-            echo "ℹ️ Release disabled - event: ${{ github.event_name }}, ref: ${{ github.ref }}"
+            echo "ℹ️ Release disabled - event: ${{ github.event_name }}, base: ${{ github.base_ref }}, head: ${{ github.head_ref }}"
           fi
 
       - name: Setup Rust environment

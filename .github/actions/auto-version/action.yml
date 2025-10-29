@@ -42,6 +42,18 @@ runs:
     - name: Setup Git configuration
       uses: ./.github/actions/setup-git
       
+    - name: Fetch and setup branches
+      shell: bash
+      run: |
+        echo "🔄 Fetching latest changes..."
+        git fetch origin
+        
+        BASE_BRANCH="${{ inputs.base-branch }}"
+        HEAD_BRANCH="${{ inputs.head-branch }}"
+        
+        echo "🌿 Setting up branches: $BASE_BRANCH and $HEAD_BRANCH"
+        git checkout "$HEAD_BRANCH" || git checkout -b "$HEAD_BRANCH" "origin/$HEAD_BRANCH"
+        
     - name: Get current version
       id: current-version
       shell: bash
@@ -140,6 +152,11 @@ runs:
         
         echo "✅ Updated $VERSION_FILE to version $NEW_VERSION"
         
+        # Ensure we're on the correct branch for pushing
+        HEAD_BRANCH="${{ inputs.head-branch }}"
+        echo "🔀 Ensuring we're on branch $HEAD_BRANCH"
+        git checkout "$HEAD_BRANCH" || git checkout -b "$HEAD_BRANCH"
+        
         # Create git tag
         git add "$VERSION_FILE"
         git commit -m "chore: bump version to $NEW_VERSION"
@@ -147,7 +164,6 @@ runs:
         echo "🏷️ Created tag v$NEW_VERSION"
         
         # Push changes
-        HEAD_BRANCH="${{ inputs.head-branch }}"
         git push origin "$HEAD_BRANCH"
         git push origin "v$NEW_VERSION"
         echo "✅ Pushed version and tag"

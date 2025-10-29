@@ -1,0 +1,45 @@
+name: 'Update Changelog'
+
+on:
+  push:
+    branches: ['develop', 'main']
+  pull_request:
+    branches: ['develop', 'main']
+
+jobs:
+  update-changelog:
+    name: Update Changelog
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Install git-cliff
+        uses: taiki-e/install-action@v2
+        with:
+          tool: git-cliff
+      
+      - name: Generate Changelog
+        run: |
+          git cliff --output CHANGELOG.md
+      
+      - name: Check for changelog changes
+        id: changelog_changed
+        run: |
+          if git diff --quiet CHANGELOG.md; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Commit updated changelog
+        if: steps.changelog_changed.outputs.changed == 'true'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add CHANGELOG.md
+          git commit -m "chore: update changelog [skip ci]"
+          git push

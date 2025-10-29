@@ -53,28 +53,98 @@
 
 ### 📦 Installation
 
-#### **Option 1: Download Pre-built Binaries** *(Recommended)*
+#### **🎯 Recommended: Platform Installers**
 
+<details>
+<summary><b>� macOS</b></summary>
+
+**PKG Installer (Recommended)**
+1. Download `disk-cleaner-macos-v0.2.0.pkg` from [releases page](https://github.com/srcheesedev/disk-cleaner/releases/latest)
+2. Double-click to install
+3. The `disk-cleaner` command will be available in your terminal
+
+**Command Line Install**
 ```bash
-# Download the latest release for your platform
-curl -L https://github.com/srcheesedev/disk-cleaner/releases/latest/download/disk-cleaner-linux.tar.gz | tar xz
-./disk-cleaner-rs --help
+curl -L -O https://github.com/srcheesedev/disk-cleaner/releases/latest/download/disk-cleaner-macos-v0.2.0.pkg
+sudo installer -pkg disk-cleaner-macos-v0.2.0.pkg -target /
+```
+</details>
+
+<details>
+<summary><b>🐧 Linux</b></summary>
+
+**Debian/Ubuntu (.deb)**
+```bash
+# Download and install
+curl -L -O https://github.com/srcheesedev/disk-cleaner/releases/latest/download/disk-cleaner_0.2.0_amd64.deb
+sudo dpkg -i disk-cleaner_0.2.0_amd64.deb
 ```
 
-#### **Option 2: Install from Source**
+**RHEL/Fedora/CentOS (.rpm)**
+```bash
+# Download and install
+curl -L -O https://github.com/srcheesedev/disk-cleaner/releases/latest/download/disk-cleaner-0.2.0-1.x86_64.rpm
+sudo rpm -i disk-cleaner-0.2.0-1.x86_64.rpm
+```
+
+**Arch Linux (AUR) - Future**
+```bash
+# Coming soon to AUR
+yay -S disk-cleaner
+```
+</details>
+
+<details>
+<summary><b>🪟 Windows</b></summary>
+
+**MSI Installer (Recommended)**
+1. Download `disk-cleaner-windows-v0.2.0.msi` from [releases page](https://github.com/srcheesedev/disk-cleaner/releases/latest)
+2. Run the installer
+3. The tool will be available in your PATH as `disk-cleaner`
+
+**PowerShell Install (as Administrator)**
+```powershell
+Invoke-WebRequest -Uri "https://github.com/srcheesedev/disk-cleaner/releases/latest/download/disk-cleaner-windows-v0.2.0.msi" -OutFile "disk-cleaner.msi"
+Start-Process msiexec.exe -ArgumentList "/i disk-cleaner.msi /quiet" -Wait
+```
+
+**Chocolatey - Future**
+```powershell
+# Coming soon to Chocolatey
+choco install disk-cleaner
+```
+</details>
+
+#### **⚡ One-Line Install Script**
+
+```bash
+# Universal installer (Linux/macOS/Windows+WSL)
+curl -fsSL https://raw.githubusercontent.com/srcheesedev/disk-cleaner/main/scripts/universal-install.sh | bash
+```
+
+#### **🔧 Manual Binary Download**
+
+Download pre-built binaries from our [releases page](https://github.com/srcheesedev/disk-cleaner/releases/latest):
+
+| Platform | Download |
+|----------|----------|
+| 🍎 macOS (Intel) | `disk-cleaner-macos-x64` |
+| 🍎 macOS (Apple Silicon) | `disk-cleaner-macos-arm64` |
+| 🐧 Linux (x64) | `disk-cleaner-linux-x64` |
+| 🐧 Linux (ARM64) | `disk-cleaner-linux-arm64` |
+| 🪟 Windows (x64) | `disk-cleaner-windows-x64.exe` |
+
+#### **🛠️ Build from Source**
 
 ```bash
 # Requires Rust 1.70+
 git clone https://github.com/srcheesedev/disk-cleaner.git
 cd disk-cleaner
+cargo build --release
+
+# Binary will be at target/release/disk-cleaner-rs
+# Copy to your PATH or install with:
 cargo install --path .
-```
-
-#### **Option 3: Use the Install Script**
-
-```bash
-# Auto-detects your platform and installs to ~/.local/bin
-curl -fsSL https://github.com/srcheesedev/disk-cleaner/raw/main/install.sh | bash
 ```
 
 ### 🎮 Basic Usage
@@ -238,6 +308,33 @@ The project maintains high code quality standards:
 - **📝 100% Documented**: Every public API has comprehensive documentation
 - **🔒 Security Audited**: Regular security audits with `cargo audit`
 - **🎯 Memory Safe**: Rust's ownership system prevents common bugs
+
+### 📝 **Changelog Management**
+
+This project uses automated changelog generation with [git-cliff](https://github.com/orhun/git-cliff):
+
+```bash
+# Generate changelog manually
+./scripts/generate-changelog.sh
+
+# Generate only latest release
+./scripts/generate-changelog.sh latest
+
+# Generate unreleased changes
+./scripts/generate-changelog.sh unreleased
+```
+
+**Commit Message Format**: We follow [Conventional Commits](https://www.conventionalcommits.org/):
+
+- `feat:` - New features
+- `fix:` - Bug fixes  
+- `docs:` - Documentation changes
+- `style:` - Code style changes
+- `refactor:` - Code refactoring
+- `test:` - Test additions/changes
+- `chore:` - Maintenance tasks
+
+The changelog is automatically updated on releases and can be manually generated during development.
 
 ---
 

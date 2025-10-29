@@ -12,6 +12,10 @@ keywords = ["disk", "cleaner", "analyzer", "storage", "utility"]
 categories = ["command-line-utilities", "filesystem"]
 readme = "README.md"
 
+[[bin]]
+name = "disk-cleaner"
+path = "src/main.rs"
+
 [dependencies]
 clap = { version = "4.4", features = ["derive"] }
 tokio = { version = "1.40", features = ["full"] }

@@ -49,7 +49,7 @@ use file_manager::FileManager;
 #[derive(Parser)]
 #[command(name = "disk-cleaner")]
 #[command(about = "Interactive directory size analyzer and cleanup tool")]
-#[command(version = "0.1.0")]
+#[command(version = env!("CARGO_PKG_VERSION"))]
 #[command(long_about = "
 🔍 Disk Cleaner - Interactive Directory Analysis Tool
 

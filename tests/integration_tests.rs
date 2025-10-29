@@ -40,8 +40,8 @@ fn create_integration_test_structure() -> Result<TempDir, Box<dyn std::error::Er
 
 /// Helper function to create a command for the binary
 fn get_test_command() -> Command {
-    // Use the modern way to get cargo binary command
-    Command::new(env!("CARGO_BIN_EXE_disk-cleaner-rs"))
+    // Use the modern way to get cargo binary command with fallback support
+    Command::new(env!("CARGO_BIN_EXE_disk-cleaner"))
 }
 
 #[test]
@@ -59,7 +59,7 @@ fn test_cli_version() {
     cmd.arg("--version");
     cmd.assert()
         .success()
-        .stdout(predicate::str::contains("0.1.0"));
+        .stdout(predicate::str::contains("0.2.0"));
 }
 
 #[test]

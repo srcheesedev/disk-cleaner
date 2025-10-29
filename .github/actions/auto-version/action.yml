@@ -52,8 +52,8 @@ runs:
         elif [ "$VERSION_FILE" = "package.json" ]; then
           CURRENT=$(grep '"version":' package.json | cut -d'"' -f4)
         else
-          PATTERN="${{ inputs.version-pattern }}"
-          CURRENT=$(grep -E "$PATTERN" "$VERSION_FILE" | sed -E "s|$PATTERN|\1|")
+          PATTERN='${{ inputs.version-pattern }}'
+          CURRENT=$(grep -E "$PATTERN" "$VERSION_FILE" | sed -E 's/.*"([0-9]+\.[0-9]+\.[0-9]+)".*/\1/')
         fi
         echo "current=$CURRENT" >> $GITHUB_OUTPUT
         echo "📦 Current version: $CURRENT"
@@ -99,12 +99,14 @@ runs:
         
         echo "📊 Current: $CURRENT, Bump: $BUMP"
         
-        # Parse semantic version
-        if [[ $CURRENT =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
-          MAJOR=${BASH_REMATCH[1]}
-          MINOR=${BASH_REMATCH[2]}
-          PATCH=${BASH_REMATCH[3]}
-        else
+        # Parse semantic version using simple string operations
+        IFS='.' read -ra VERSION_PARTS <<< "$CURRENT"
+        MAJOR="${VERSION_PARTS[0]}"
+        MINOR="${VERSION_PARTS[1]}"  
+        PATCH="${VERSION_PARTS[2]}"
+        
+        # Validate we have a proper version
+        if [ -z "$MAJOR" ] || [ -z "$MINOR" ] || [ -z "$PATCH" ]; then
           echo "❌ Invalid version format: $CURRENT"
           exit 1
         fi
@@ -131,15 +133,14 @@ runs:
         # Update version in file
         VERSION_FILE="${{ inputs.version-file }}"
         if [ "$VERSION_FILE" = "Cargo.toml" ]; then
-          sed -i "s/^version = \".*\"/version = \"$NEW_VERSION\"/" Cargo.toml
+          sed -i.bak "s/^version = \".*\"/version = \"$NEW_VERSION\"/" Cargo.toml
         elif [ "$VERSION_FILE" = "package.json" ]; then
-          sed -i "s/\"version\": *\"[^\"]*\"/\"version\": \"$NEW_VERSION\"/" package.json
+          sed -i.bak "s/\"version\": *\"[^\"]*\"/\"version\": \"$NEW_VERSION\"/" package.json
         fi
         
         echo "✅ Updated $VERSION_FILE to version $NEW_VERSION"
         
         # Create git tag
-        VERSION_FILE="${{ inputs.version-file }}"
         git add "$VERSION_FILE"
         git commit -m "chore: bump version to $NEW_VERSION"
         git tag "v$NEW_VERSION"

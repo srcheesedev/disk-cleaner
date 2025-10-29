@@ -205,7 +205,18 @@ jobs:
           cache-key-suffix: 'shared'
 
       - name: Run security audit
-        run: cargo audit
+        run: |
+          # Ensure cargo-audit is available (fallback)
+          if ! command -v cargo-audit &> /dev/null; then
+            echo "🔧 cargo-audit not found, installing as fallback..."
+            cargo install cargo-audit --locked
+            echo "✅ cargo-audit installed successfully"
+          fi
+          
+          # Verify cargo-audit is working
+          cargo audit --version
+          echo "🔍 Running security audit..."
+          cargo audit
 
   # ================================================================
   # STAGE 4: VERSIONING (PR develop -> main only)
@@ -299,8 +310,13 @@ jobs:
           # Ensure git-cliff is available (fallback)
           if ! command -v git-cliff &> /dev/null; then
             echo "🔧 git-cliff not found, installing as fallback..."
-            cargo install git-cliff
+            cargo install git-cliff --locked
+            echo "✅ git-cliff installed successfully"
           fi
+          
+          # Verify git-cliff is working
+          git-cliff --version
+          echo "📝 Generating changelog..."
           
           CHANGELOG=$(git cliff --latest --strip header)
           echo "changelog<<EOF" >> $GITHUB_OUTPUT

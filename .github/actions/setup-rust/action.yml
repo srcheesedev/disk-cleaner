@@ -71,10 +71,14 @@ runs:
       run: |
         if ! command -v cargo-audit &> /dev/null; then
           echo "📦 Installing cargo-audit..."
-          cargo install cargo-audit
+          cargo install cargo-audit --locked
+          echo "✅ cargo-audit installed successfully"
         else
           echo "✅ cargo-audit already installed"
         fi
+        
+        # Verify installation
+        cargo audit --version
 
     - name: Install git-cliff
       if: inputs.install-git-cliff == 'true'
@@ -82,10 +86,14 @@ runs:
       run: |
         if ! command -v git-cliff &> /dev/null; then
           echo "📦 Installing git-cliff..."
-          cargo install git-cliff
+          cargo install git-cliff --locked
+          echo "✅ git-cliff installed successfully"
         else
           echo "✅ git-cliff already installed"
         fi
+        
+        # Verify installation
+        git-cliff --version
 
     - name: Validate tools installation
       shell: bash

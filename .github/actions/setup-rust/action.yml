@@ -22,6 +22,10 @@ inputs:
     description: 'Whether to install cargo-audit'
     required: false
     default: 'false'
+  install-git-cliff:
+    description: 'Whether to install git-cliff'
+    required: false
+    default: 'false'
 
 outputs:
   cache-hit:
@@ -71,6 +75,50 @@ runs:
         else
           echo "✅ cargo-audit already installed"
         fi
+
+    - name: Install git-cliff
+      if: inputs.install-git-cliff == 'true'
+      shell: bash
+      run: |
+        if ! command -v git-cliff &> /dev/null; then
+          echo "📦 Installing git-cliff..."
+          cargo install git-cliff
+        else
+          echo "✅ git-cliff already installed"
+        fi
+
+    - name: Validate tools installation
+      shell: bash
+      run: |
+        echo "🔍 Validating installed tools..."
+        
+        # Always validate core tools
+        rustc --version || (echo "❌ rustc not found" && exit 1)
+        cargo --version || (echo "❌ cargo not found" && exit 1)
+        
+        # Validate optional components
+        if [[ "${{ inputs.components }}" == *"rustfmt"* ]]; then
+          cargo fmt --version || (echo "❌ rustfmt not found" && exit 1)
+          echo "✅ rustfmt validated"
+        fi
+        
+        if [[ "${{ inputs.components }}" == *"clippy"* ]]; then
+          cargo clippy --version || (echo "❌ clippy not found" && exit 1) 
+          echo "✅ clippy validated"
+        fi
+        
+        # Validate optional tools
+        if [[ "${{ inputs.install-cargo-audit }}" == "true" ]]; then
+          cargo audit --version || (echo "❌ cargo-audit not found" && exit 1)
+          echo "✅ cargo-audit validated"
+        fi
+        
+        if [[ "${{ inputs.install-git-cliff }}" == "true" ]]; then
+          git-cliff --version || (echo "❌ git-cliff not found" && exit 1)
+          echo "✅ git-cliff validated"
+        fi
+        
+        echo "🎉 All tools validated successfully!"
 
     - name: Cache info
       shell: bash

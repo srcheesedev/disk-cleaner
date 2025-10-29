@@ -12,14 +12,6 @@ inputs:
   token:
     description: 'GitHub token'
     required: true
-  main-branch:
-    description: 'Main branch name'
-    required: false
-    default: 'main'
-  develop-branch:
-    description: 'Development branch name'
-    required: false
-    default: 'develop'
   prerelease:
     description: 'Mark as prerelease'
     required: false
@@ -133,7 +125,6 @@ runs:
         files: release-files/*
         draft: false
         prerelease: ${{ inputs.prerelease }}
-        make_latest: true
       env:
         GITHUB_TOKEN: ${{ inputs.token }}
 
@@ -172,28 +163,18 @@ runs:
         mv CHANGELOG_NEW.md CHANGELOG.md
         echo "✅ Updated CHANGELOG.md"
 
-    - name: Setup Git and sync branches
+    - name: Setup Git and commit changelog
       uses: ./.github/actions/setup-git
 
-    - name: Sync changelog to main branch
+    - name: Commit updated changelog
       shell: bash
       run: |
-        echo "🔄 Syncing changelog to ${{ inputs.main-branch }}..."
-        git checkout ${{ inputs.main-branch }}
+        echo "📝 Committing updated changelog..."
         git add CHANGELOG.md
         if git diff --staged --quiet; then
           echo "ℹ️ No changes to commit"
         else
           git commit -m "docs: update changelog for v${{ inputs.version }} [skip ci]"
-          git push origin ${{ inputs.main-branch }}
-          echo "✅ Pushed changelog to ${{ inputs.main-branch }}"
+          git push origin HEAD
+          echo "✅ Pushed updated changelog"
         fi
-
-    - name: Sync changelog to develop branch
-      shell: bash
-      run: |
-        echo "🔄 Syncing changelog to ${{ inputs.develop-branch }}..."
-        git checkout ${{ inputs.develop-branch }}
-        git merge ${{ inputs.main-branch }} --no-ff -m "docs: sync changelog from ${{ inputs.main-branch }} [skip ci]"
-        git push origin ${{ inputs.develop-branch }}
-        echo "✅ Synced changelog to ${{ inputs.develop-branch }}"

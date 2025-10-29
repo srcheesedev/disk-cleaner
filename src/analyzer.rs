@@ -4,6 +4,9 @@
 //! This module provides the core functionality for scanning filesystems and
 //! calculating directory sizes efficiently.
 //!
+//! Copyright (c) 2025 @srcheesedev
+//! Licensed under the MIT License - see LICENSE file for details
+//!
 //! ## Key Features
 //!
 //! - **Async Processing**: Non-blocking directory traversal for large filesystems
@@ -124,7 +127,6 @@ impl DirectoryEntry {
 /// ```
 #[derive(Debug)]
 pub struct DiskAnalyzer {
-    #[allow(dead_code)] // Reserved for future depth limiting feature
     max_depth: usize,
 }
 
@@ -133,8 +135,8 @@ impl DiskAnalyzer {
         Self { max_depth }
     }
 
-    /// Calculate size of a single file or directory
-    pub fn calculate_size<P: AsRef<Path>>(path: P) -> Result<u64> {
+    /// Calculate size of a single file or directory with depth limiting
+    pub fn calculate_size<P: AsRef<Path>>(&self, path: P) -> Result<u64> {
         let path = path.as_ref();
 
         if !path.exists() {
@@ -147,7 +149,10 @@ impl DiskAnalyzer {
 
         let mut total_size = 0u64;
 
-        for entry in WalkDir::new(path).follow_links(false) {
+        for entry in WalkDir::new(path)
+            .follow_links(false)
+            .max_depth(self.max_depth)
+        {
             match entry {
                 Ok(entry) => {
                     if entry.file_type().is_file() {
@@ -156,7 +161,18 @@ impl DiskAnalyzer {
                         }
                     }
                 }
-                Err(_) => continue, // Skip inaccessible files
+                Err(e) => {
+                    eprintln!(
+                        "Warning: Cannot access {}: {}",
+                        e.path()
+                            .map(|p| p.display().to_string())
+                            .unwrap_or_else(|| "unknown path".to_string()),
+                        e.io_error()
+                            .map(|io_e| io_e.to_string())
+                            .unwrap_or_else(|| "unknown error".to_string())
+                    );
+                    continue;
+                }
             }
         }
 
@@ -184,7 +200,7 @@ impl DiskAnalyzer {
         let mut entries = Vec::new();
         let mut tasks = Vec::new();
 
-        // Read directory entries
+        // Read directory entries with depth limiting
         for entry in fs::read_dir(path)? {
             let entry = entry?;
             let entry_path = entry.path();
@@ -192,8 +208,15 @@ impl DiskAnalyzer {
 
             // Spawn async task for size calculation
             let path_clone = entry_path.clone();
+            let max_depth = if is_directory {
+                self.max_depth.saturating_sub(1)
+            } else {
+                1
+            };
+            let analyzer = DiskAnalyzer::new(max_depth);
+
             let handle = task::spawn_blocking(move || {
-                let size = Self::calculate_size(&path_clone).unwrap_or(0);
+                let size = analyzer.calculate_size(&path_clone).unwrap_or(0);
                 DirectoryEntry::new(path_clone, size, is_directory)
             });
 
@@ -268,8 +291,9 @@ mod tests {
     async fn test_calculate_file_size() {
         let temp_dir = create_test_structure().unwrap();
         let file_path = temp_dir.path().join("large_file.txt");
+        let analyzer = DiskAnalyzer::new(3);
 
-        let size = DiskAnalyzer::calculate_size(&file_path).unwrap();
+        let size = analyzer.calculate_size(&file_path).unwrap();
         assert_eq!(size, 1000);
     }
 
@@ -277,8 +301,9 @@ mod tests {
     async fn test_calculate_directory_size() {
         let temp_dir = create_test_structure().unwrap();
         let subdir_path = temp_dir.path().join("subdir");
+        let analyzer = DiskAnalyzer::new(3);
 
-        let size = DiskAnalyzer::calculate_size(&subdir_path).unwrap();
+        let size = analyzer.calculate_size(&subdir_path).unwrap();
         assert_eq!(size, 500);
     }
 
@@ -360,7 +385,8 @@ mod tests {
 
     #[test]
     async fn test_calculate_size_nonexistent() {
-        let result = DiskAnalyzer::calculate_size("/nonexistent/file");
+        let analyzer = DiskAnalyzer::new(3);
+        let result = analyzer.calculate_size("/nonexistent/file");
         assert_eq!(result.unwrap(), 0);
     }
 }

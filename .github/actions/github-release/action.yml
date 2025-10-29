@@ -1,0 +1,150 @@
+name: 'Create GitHub Release'
+description: 'Creates GitHub release with artifacts and syncs changelog'
+
+inputs:
+  version:
+    description: 'Version to release'
+    required: true
+  token:
+    description: 'GitHub token'
+    required: true
+  main-branch:
+    description: 'Main branch name'
+    required: false
+    default: 'main'
+  develop-branch:
+    description: 'Development branch name'
+    required: false
+    default: 'develop'
+  prerelease:
+    description: 'Mark as prerelease'
+    required: false
+    default: 'false'
+
+outputs:
+  release-url:
+    description: 'URL of created release'
+    value: ${{ steps.create-release.outputs.url }}
+  release-id:
+    description: 'ID of created release'
+    value: ${{ steps.create-release.outputs.id }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts
+
+    - name: Prepare release files
+      shell: bash
+      run: |
+        mkdir -p release-files
+        find artifacts -name "*.tar.gz" -exec cp {} release-files/ \;
+        find artifacts -name "*.zip" -exec cp {} release-files/ \;
+        echo "📦 Release files prepared:"
+        ls -la release-files/
+
+    - name: Generate changelog
+      shell: bash
+      run: |
+        VERSION="v${{ inputs.version }}"
+        TODAY=$(date +%Y-%m-%d)
+        
+        echo "# Release $VERSION" > release_notes.md
+        echo "" >> release_notes.md
+        echo "Released on $TODAY" >> release_notes.md
+        echo "" >> release_notes.md
+        echo "## Changes" >> release_notes.md
+        echo "" >> release_notes.md
+        
+        # Get commits since last tag
+        if git describe --tags --abbrev=0 HEAD~1 >/dev/null 2>&1; then
+          LAST_TAG=$(git describe --tags --abbrev=0 HEAD~1)
+          echo "Changes since $LAST_TAG:" >> release_notes.md
+          echo "" >> release_notes.md
+          git log --pretty=format:"- %s" $LAST_TAG..HEAD --no-merges >> release_notes.md
+        else
+          echo "Initial release" >> release_notes.md
+          echo "" >> release_notes.md
+          git log --pretty=format:"- %s" --no-merges --max-count=20 >> release_notes.md
+        fi
+        
+        echo "" >> release_notes.md
+        echo "🎯 **Download the appropriate binary for your platform above**" >> release_notes.md
+
+    - name: Create GitHub Release
+      id: create-release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: "v${{ inputs.version }}"
+        name: "Release v${{ inputs.version }}"
+        body_path: release_notes.md
+        files: release-files/*
+        draft: false
+        prerelease: ${{ inputs.prerelease }}
+        make_latest: true
+      env:
+        GITHUB_TOKEN: ${{ inputs.token }}
+
+    - name: Update CHANGELOG.md
+      shell: bash
+      run: |
+        VERSION="v${{ inputs.version }}"
+        TODAY=$(date +%Y-%m-%d)
+        
+        # Create new changelog content
+        echo "# Changelog" > CHANGELOG_NEW.md
+        echo "" >> CHANGELOG_NEW.md
+        echo "All notable changes to this project will be documented in this file." >> CHANGELOG_NEW.md
+        echo "" >> CHANGELOG_NEW.md
+        echo "## [$VERSION] - $TODAY" >> CHANGELOG_NEW.md
+        echo "" >> CHANGELOG_NEW.md
+        
+        # Add changes from git log
+        if git describe --tags --abbrev=0 HEAD~1 >/dev/null 2>&1; then
+          LAST_TAG=$(git describe --tags --abbrev=0 HEAD~1)
+          git log --pretty=format:"- %s" $LAST_TAG..HEAD --no-merges >> CHANGELOG_NEW.md
+        else
+          echo "### Added" >> CHANGELOG_NEW.md
+          echo "- Initial release" >> CHANGELOG_NEW.md
+        fi
+        
+        echo "" >> CHANGELOG_NEW.md
+        echo "" >> CHANGELOG_NEW.md
+        
+        # Append existing changelog if exists
+        if [ -f CHANGELOG.md ]; then
+          # Skip the header lines from existing file
+          tail -n +4 CHANGELOG.md >> CHANGELOG_NEW.md
+        fi
+        
+        mv CHANGELOG_NEW.md CHANGELOG.md
+        echo "✅ Updated CHANGELOG.md"
+
+    - name: Setup Git and sync branches
+      uses: ./.github/actions/setup-git
+
+    - name: Sync changelog to main branch
+      shell: bash
+      run: |
+        echo "🔄 Syncing changelog to ${{ inputs.main-branch }}..."
+        git checkout ${{ inputs.main-branch }}
+        git add CHANGELOG.md
+        if git diff --staged --quiet; then
+          echo "ℹ️ No changes to commit"
+        else
+          git commit -m "docs: update changelog for v${{ inputs.version }} [skip ci]"
+          git push origin ${{ inputs.main-branch }}
+          echo "✅ Pushed changelog to ${{ inputs.main-branch }}"
+        fi
+
+    - name: Sync changelog to develop branch
+      shell: bash
+      run: |
+        echo "🔄 Syncing changelog to ${{ inputs.develop-branch }}..."
+        git checkout ${{ inputs.develop-branch }}
+        git merge ${{ inputs.main-branch }} --no-ff -m "docs: sync changelog from ${{ inputs.main-branch }} [skip ci]"
+        git push origin ${{ inputs.develop-branch }}
+        echo "✅ Synced changelog to ${{ inputs.develop-branch }}"

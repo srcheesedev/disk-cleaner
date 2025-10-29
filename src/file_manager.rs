@@ -3,6 +3,9 @@
 //! Provides safe file operations and interactive user interfaces for the disk cleaner.
 //! This module handles all user interactions, file deletion operations, and safety validations.
 //!
+//! Copyright (c) 2025 @srcheesedev
+//! Licensed under the MIT License - see LICENSE file for details
+//!
 //! ## Key Features
 //!
 //! - **Interactive Selection**: Multi-select interface with beautiful formatting
@@ -36,6 +39,11 @@ use crate::platform::PlatformUtils;
 use anyhow::Result;
 use dialoguer::{theme::ColorfulTheme, Confirm, MultiSelect};
 use std::path::Path;
+
+// Constants for UI formatting
+const TABLE_WIDTH: usize = 60;
+const SIZE_COLUMN_WIDTH: usize = 8;
+const TYPE_COLUMN_WIDTH: usize = 4;
 
 /// Handles user interaction for file selection and deletion
 /// Safe file operations manager with interactive user interface capabilities.
@@ -105,7 +113,14 @@ impl FileManager {
                     .file_name()
                     .map(|n| n.to_string_lossy())
                     .unwrap_or_else(|| entry.path.to_string_lossy());
-                format!("{:>8} {:>4} {}", entry.size_human, file_type, name)
+                format!(
+                    "{:>width_size$} {:>width_type$} {}",
+                    entry.size_human,
+                    file_type,
+                    name,
+                    width_size = SIZE_COLUMN_WIDTH,
+                    width_type = TYPE_COLUMN_WIDTH
+                )
             })
             .collect();
 
@@ -139,10 +154,12 @@ impl FileManager {
         for entry in entries {
             let file_type = if entry.is_directory { "DIR " } else { "FILE" };
             println!(
-                "  {:>8} {:>4} {}",
+                "  {:>width_size$} {:>width_type$} {}",
                 entry.size_human,
                 file_type,
-                entry.path.display()
+                entry.path.display(),
+                width_size = SIZE_COLUMN_WIDTH,
+                width_type = TYPE_COLUMN_WIDTH
             );
             total_size += entry.size_bytes;
         }
@@ -177,8 +194,14 @@ impl FileManager {
                     deleted.push(entry.path.to_string_lossy().to_string());
                 }
                 Err(e) => {
-                    println!("❌ ({})", e);
-                    failed.push(format!("{} ({})", entry.path.display(), e));
+                    // Use friendly error message for better user experience
+                    let friendly_msg = if let Some(io_error) = e.downcast_ref::<std::io::Error>() {
+                        PlatformUtils::friendly_error_message(io_error)
+                    } else {
+                        e.to_string()
+                    };
+                    println!("❌ ({})", friendly_msg);
+                    failed.push(format!("{} ({})", entry.path.display(), friendly_msg));
                 }
             }
         }
@@ -217,9 +240,15 @@ impl FileManager {
         }
 
         println!("\n📊 Directory Contents (sorted by size):");
-        println!("{:-<60}", "");
-        println!("{:>8} {:>4} NAME", "SIZE", "TYPE");
-        println!("{:-<60}", "");
+        println!("{:-<width$}", "", width = TABLE_WIDTH);
+        println!(
+            "{:>width_size$} {:>width_type$} NAME",
+            "SIZE",
+            "TYPE",
+            width_size = SIZE_COLUMN_WIDTH,
+            width_type = TYPE_COLUMN_WIDTH
+        );
+        println!("{:-<width$}", "", width = TABLE_WIDTH);
 
         for entry in entries {
             let file_type = if entry.is_directory { "DIR " } else { "FILE" };
@@ -228,13 +257,26 @@ impl FileManager {
                 .file_name()
                 .map(|n| n.to_string_lossy())
                 .unwrap_or_else(|| entry.path.to_string_lossy());
-            println!("{:>8} {:>4} {}", entry.size_human, file_type, name);
+            println!(
+                "{:>width_size$} {:>width_type$} {}",
+                entry.size_human,
+                file_type,
+                name,
+                width_size = SIZE_COLUMN_WIDTH,
+                width_type = TYPE_COLUMN_WIDTH
+            );
         }
 
         let total_size: u64 = entries.iter().map(|e| e.size_bytes).sum();
         let total_human = humansize::format_size(total_size, humansize::DECIMAL);
-        println!("{:-<60}", "");
-        println!("{:>8} {:>4} TOTAL", total_human, "");
+        println!("{:-<width$}", "", width = TABLE_WIDTH);
+        println!(
+            "{:>width_size$} {:>width_type$} TOTAL",
+            total_human,
+            "",
+            width_size = SIZE_COLUMN_WIDTH,
+            width_type = TYPE_COLUMN_WIDTH
+        );
     }
 }
 

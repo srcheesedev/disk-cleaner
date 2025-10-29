@@ -3,10 +3,9 @@ name: CI/CD Pipeline
 on:
   push:
     branches: [ main, develop ]
-    tags: [ 'v*' ]
   pull_request:
     branches: [ main ]
-    types: [ opened, synchronize, reopened, closed ]
+    types: [ opened, synchronize, reopened ]
 
 permissions:
   contents: write
@@ -15,238 +14,72 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  CARGO_NET_RETRY: 10
+  RUST_BACKTRACE: short
+  RUSTUP_MAX_RETRIES: 10
 
 jobs:
   # ================================================================
-  # QUALITY CHECKS - Always run on PRs and pushes
+  # TESTS - Quality & Security Analysis
   # ================================================================
-  test:
-    name: Test Suite
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        rust: [stable, beta]
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Install Rust
-      uses: dtolnay/rust-toolchain@stable
-      with:
-        toolchain: ${{ matrix.rust }}
-        components: rustfmt, clippy
-
-    - name: Cache dependencies
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.cargo/registry
-          ~/.cargo/git
-          target
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-
-    - name: Check formatting
-      run: cargo fmt --all -- --check
-
-    - name: Lint with clippy
-      run: cargo clippy --all-targets --all-features -- -D warnings
-
-    - name: Run tests
-      run: cargo test --verbose
-
-    - name: Check documentation
-      run: cargo doc --no-deps --document-private-items
-
-  # ================================================================
-  # SECURITY AUDIT - Always run on PRs and pushes
-  # ================================================================
-  security:
-    name: Security Audit
+  tests:
+    name: Quality & Security Tests
     runs-on: ubuntu-latest
     
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      
-    - name: Install Rust
-      uses: dtolnay/rust-toolchain@stable
-      
-    - name: Install cargo-audit
-      run: cargo install cargo-audit
-      
-    - name: Run security audit
-      run: cargo audit
 
-  # ================================================================
-  # COMPILE CHECK - Only for PRs and develop pushes (no artifacts)
-  # ================================================================
-  compile-check:
-    name: Compile Check
-    needs: [test]
-    runs-on: ubuntu-latest
-    # Only run compile check on PRs and develop pushes (not on tag releases)
-    if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/develop')
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Install Rust
-      uses: dtolnay/rust-toolchain@stable
-      
-    - name: Cache dependencies
-      uses: actions/cache@v4
+    - name: Setup Rust environment
+      uses: ./.github/actions/setup-rust
       with:
-        path: |
-          ~/.cargo/registry
-          ~/.cargo/git
-          target
-        key: ${{ runner.os }}-compile-check-cargo-${{ hashFiles('**/Cargo.lock') }}
-    
-    - name: Check compilation
-      run: cargo check --release
-      
-    - name: Verify build works
-      run: cargo build --release
+        components: 'rustfmt,clippy'
+        install-cargo-audit: 'true'
+        cache-key-suffix: 'tests'
+
+    - name: Run quality checks
+      run: |
+        cargo fmt --all -- --check
+        cargo clippy --all-targets --all-features -- -D warnings
+        cargo test --verbose
+        cargo doc --no-deps --document-private-items
+        cargo audit
 
   # ================================================================
-  # ARTIFACT BUILDING - Only when creating releases (tag pushes)
+  # BUILD - Compilation Verification
   # ================================================================
   build:
-    name: Build Release Artifacts
-    needs: [test, security]
-    runs-on: ${{ matrix.os }}
-    # Only build artifacts when creating a release (tag push)
-    if: startsWith(github.ref, 'refs/tags/v')
-    strategy:
-      matrix:
-        include:
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-            suffix: ""
-            platform: "linux"
-          - os: windows-latest
-            target: x86_64-pc-windows-msvc
-            suffix: ".exe"
-            platform: "windows"
-          - os: macos-latest
-            target: x86_64-apple-darwin
-            suffix: ""
-            platform: "macos-intel"
-          - os: macos-latest
-            target: aarch64-apple-darwin
-            suffix: ""
-            platform: "macos-arm64"
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Install Rust
-      uses: dtolnay/rust-toolchain@stable
-      with:
-        targets: ${{ matrix.target }}
-
-    - name: Cache dependencies
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.cargo/registry
-          ~/.cargo/git
-          target
-        key: ${{ runner.os }}-${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-
-    - name: Build release
-      run: cargo build --release --target ${{ matrix.target }}
-
-    - name: Create archive
-      shell: bash
-      run: |
-        mkdir -p dist
-        if [ "${{ matrix.os }}" = "windows-latest" ]; then
-          cp target/${{ matrix.target }}/release/disk-cleaner-rs${{ matrix.suffix }} dist/
-          cp README.md LICENSE dist/
-          cd dist && 7z a ../disk-cleaner-${{ matrix.platform }}.zip *
-        else
-          cp target/${{ matrix.target }}/release/disk-cleaner-rs${{ matrix.suffix }} dist/
-          cp README.md LICENSE install.sh dist/
-          cd dist && tar -czf ../disk-cleaner-${{ matrix.platform }}.tar.gz *
-        fi
-
-    - name: Upload artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: disk-cleaner-${{ matrix.platform }}
-        path: |
-          disk-cleaner-${{ matrix.platform }}.tar.gz
-          disk-cleaner-${{ matrix.platform }}.zip
-        if-no-files-found: ignore
-
-  # ================================================================
-  # GITHUB RELEASE - Only when tags are pushed
-  # ================================================================
-  release:
-    name: Create Release
-    needs: [build]
+    name: Build Check
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [tests]
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
     
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+      
+    - name: Setup Rust environment
+      uses: ./.github/actions/setup-rust
       with:
-        fetch-depth: 0
-
-    - name: Download all artifacts
-      uses: actions/download-artifact@v4
-      with:
-        path: artifacts
-
-    - name: Prepare release files
+        cache-key-suffix: 'build'
+    
+    - name: Verify compilation
       run: |
-        mkdir -p release-files
-        find artifacts -name "*.tar.gz" -exec cp {} release-files/ \;
-        find artifacts -name "*.zip" -exec cp {} release-files/ \;
-        ls -la release-files/
-
-    - name: Generate changelog
-      id: changelog
-      run: |
-        # Extract version from tag
-        VERSION=${GITHUB_REF#refs/tags/}
-        echo "version=$VERSION" >> $GITHUB_OUTPUT
-        
-        # Generate changelog for this release
-        if [ -f CHANGELOG.md ]; then
-          # Extract changelog section for this version
-          awk "/## \[$VERSION\]/,/## \[.*\]/ { if (/## \[.*\]/ && !/## \[$VERSION\]/) exit; print }" CHANGELOG.md > release_notes.md
-        else
-          echo "Release $VERSION" > release_notes.md
-          echo "" >> release_notes.md
-          echo "See commit history for changes." >> release_notes.md
-        fi
-
-    - name: Create Release
-      uses: softprops/action-gh-release@v1
-      with:
-        name: Release ${{ steps.changelog.outputs.version }}
-        body_path: release_notes.md
-        files: |
-          release-files/*
-        draft: false
-        prerelease: ${{ contains(github.ref, '-') }}
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        cargo check --release
+        cargo build --release
 
   # ================================================================
-  # AUTO-RELEASE - Triggered when PR is merged to main
+  # AUTO-VERSION - Semantic Versioning (PR develop -> main only)
   # ================================================================
-  auto-release:
-    name: Auto Release on PR Merge
+  auto-version:
+    name: Auto Version & Tag
     runs-on: ubuntu-latest
-    needs: [test, security, compile-check]
-    if: github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'main'
+    needs: [tests, build]
+    if: github.event_name == 'pull_request' && github.base_ref == 'main' && github.head_ref == 'develop'
+    outputs:
+      new-version: ${{ steps.version.outputs.new-version }}
+      version-created: ${{ steps.version.outputs.version-created }}
     
     steps:
     - name: Checkout code
@@ -255,153 +88,68 @@ jobs:
         fetch-depth: 0
         token: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
+    - name: Auto version and tag
+      id: version
+      uses: ./.github/actions/auto-version
       with:
-        node-version: '20'
+        token: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Install dependencies
-      run: |
-        npm install -g conventional-changelog-cli @semantic-release/exec
-        npm install -g semantic-release @semantic-release/changelog @semantic-release/git
+  # ================================================================
+  # RELEASE ARTIFACTS - Multi-platform builds
+  # ================================================================
+  release-artifacts:
+    name: Build Artifacts
+    runs-on: ${{ matrix.os }}
+    needs: [auto-version]
+    if: needs.auto-version.outputs.version-created == 'true'
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            platform: "linux"
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            platform: "windows"
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            platform: "macos-intel"
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            platform: "macos-arm64"
 
-    - name: Configure Git
-      run: |
-        git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        ref: "v${{ needs.auto-version.outputs.new-version }}"
 
-    - name: Get current version
-      id: current_version
-      run: |
-        if [ -f Cargo.toml ]; then
-          CURRENT_VERSION=$(grep '^version = ' Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
-        else
-          CURRENT_VERSION="0.0.0"
-        fi
-        echo "current=$CURRENT_VERSION" >> $GITHUB_OUTPUT
-        echo "Current version: $CURRENT_VERSION"
+    - name: Build and package artifacts
+      uses: ./.github/actions/build-artifacts
+      with:
+        version: ${{ needs.auto-version.outputs.new-version }}
+        target: ${{ matrix.target }}
+        platform: ${{ matrix.platform }}
 
-    - name: Determine version bump
-      id: version_bump
-      run: |
-        # Get commit messages from PR
-        PR_COMMITS=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-          "https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/commits" \
-          | jq -r '.[].commit.message')
-        
-        echo "PR Commits:"
-        echo "$PR_COMMITS"
-        
-        # Determine version bump based on conventional commits
-        if echo "$PR_COMMITS" | grep -qE "^(feat|feature)(\(.+\))?!:|^.+!:"; then
-          echo "bump=major" >> $GITHUB_OUTPUT
-          echo "Version bump: MAJOR (breaking change)"
-        elif echo "$PR_COMMITS" | grep -qE "^(feat|feature)(\(.+\))?:"; then
-          echo "bump=minor" >> $GITHUB_OUTPUT
-          echo "Version bump: MINOR (new feature)"
-        elif echo "$PR_COMMITS" | grep -qE "^(fix|bugfix)(\(.+\))?:"; then
-          echo "bump=patch" >> $GITHUB_OUTPUT
-          echo "Version bump: PATCH (bug fix)"
-        else
-          echo "bump=patch" >> $GITHUB_OUTPUT
-          echo "Version bump: PATCH (default)"
-        fi
+  # ================================================================
+  # GITHUB RELEASE - Create release with changelog
+  # ================================================================
+  github-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [auto-version, release-artifacts]
+    if: needs.auto-version.outputs.version-created == 'true'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        ref: "v${{ needs.auto-version.outputs.new-version }}"
+        token: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Calculate new version
-      id: new_version
-      run: |
-        CURRENT="${{ steps.current_version.outputs.current }}"
-        BUMP="${{ steps.version_bump.outputs.bump }}"
-        
-        # Parse current version
-        IFS='.' read -ra VERSION_PARTS <<< "$CURRENT"
-        MAJOR=${VERSION_PARTS[0]:-0}
-        MINOR=${VERSION_PARTS[1]:-0}
-        PATCH=${VERSION_PARTS[2]:-0}
-        
-        # Bump version
-        case $BUMP in
-          major)
-            MAJOR=$((MAJOR + 1))
-            MINOR=0
-            PATCH=0
-            ;;
-          minor)
-            MINOR=$((MINOR + 1))
-            PATCH=0
-            ;;
-          patch)
-            PATCH=$((PATCH + 1))
-            ;;
-        esac
-        
-        NEW_VERSION="$MAJOR.$MINOR.$PATCH"
-        echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
-        echo "New version: $NEW_VERSION"
-
-    - name: Update Cargo.toml version
-      run: |
-        NEW_VERSION="${{ steps.new_version.outputs.version }}"
-        sed -i "s/^version = \".*\"/version = \"$NEW_VERSION\"/" Cargo.toml
-        echo "Updated Cargo.toml to version $NEW_VERSION"
-
-    - name: Update CHANGELOG.md
-      run: |
-        NEW_VERSION="${{ steps.new_version.outputs.version }}"
-        TODAY=$(date +%Y-%m-%d)
-        
-        # Create temporary changelog content
-        echo "# Changelog" > CHANGELOG_NEW.md
-        echo "" >> CHANGELOG_NEW.md
-        echo "## [$NEW_VERSION] - $TODAY" >> CHANGELOG_NEW.md
-        echo "" >> CHANGELOG_NEW.md
-        
-        # Get PR title and description for changelog
-        PR_TITLE="${{ github.event.pull_request.title }}"
-        PR_BODY="${{ github.event.pull_request.body }}"
-        
-        echo "### Changes" >> CHANGELOG_NEW.md
-        echo "- $PR_TITLE (#${{ github.event.pull_request.number }})" >> CHANGELOG_NEW.md
-        
-        # Add PR body if it contains useful information
-        if [ ! -z "$PR_BODY" ] && [ "$PR_BODY" != "null" ]; then
-          echo "" >> CHANGELOG_NEW.md
-          echo "### Details" >> CHANGELOG_NEW.md
-          echo "$PR_BODY" >> CHANGELOG_NEW.md
-        fi
-        
-        echo "" >> CHANGELOG_NEW.md
-        
-        # Append existing changelog if it exists
-        if [ -f CHANGELOG.md ]; then
-          # Skip the first line (# Changelog) from existing file
-          tail -n +2 CHANGELOG.md >> CHANGELOG_NEW.md
-        fi
-        
-        mv CHANGELOG_NEW.md CHANGELOG.md
-
-    - name: Commit version and changelog
-      run: |
-        NEW_VERSION="${{ steps.new_version.outputs.version }}"
-        git add Cargo.toml CHANGELOG.md
-        git commit -m "chore: bump version to $NEW_VERSION [skip ci]"
-
-    - name: Create and push tag
-      run: |
-        NEW_VERSION="${{ steps.new_version.outputs.version }}"
-        git tag "v$NEW_VERSION"
-        git push origin "v$NEW_VERSION"
-        echo "Created and pushed tag v$NEW_VERSION"
-
-    - name: Push changes to main
-      run: |
-        git push origin main
-
-    - name: Sync develop branch
-      run: |
-        # Switch to develop and merge main
-        git fetch origin develop
-        git checkout develop
-        git merge main --no-ff -m "chore: sync develop with main after release [skip ci]"
-        git push origin develop
-        echo "Synced develop branch with main"
+    - name: Create release and sync changelog
+      uses: ./.github/actions/github-release
+      with:
+        version: ${{ needs.auto-version.outputs.new-version }}
+        token: ${{ secrets.GITHUB_TOKEN }}

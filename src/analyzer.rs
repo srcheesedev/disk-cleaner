@@ -151,7 +151,8 @@ impl DiskAnalyzer {
 
         for entry in WalkDir::new(path)
             .follow_links(false)
-            .max_depth(self.max_depth) {
+            .max_depth(self.max_depth)
+        {
             match entry {
                 Ok(entry) => {
                     if entry.file_type().is_file() {
@@ -161,9 +162,14 @@ impl DiskAnalyzer {
                     }
                 }
                 Err(e) => {
-                    eprintln!("Warning: Cannot access {}: {}", 
-                        e.path().map(|p| p.display().to_string()).unwrap_or_else(|| "unknown path".to_string()), 
-                        e.io_error().map(|io_e| io_e.to_string()).unwrap_or_else(|| "unknown error".to_string())
+                    eprintln!(
+                        "Warning: Cannot access {}: {}",
+                        e.path()
+                            .map(|p| p.display().to_string())
+                            .unwrap_or_else(|| "unknown path".to_string()),
+                        e.io_error()
+                            .map(|io_e| io_e.to_string())
+                            .unwrap_or_else(|| "unknown error".to_string())
                     );
                     continue;
                 }
@@ -202,9 +208,13 @@ impl DiskAnalyzer {
 
             // Spawn async task for size calculation
             let path_clone = entry_path.clone();
-            let max_depth = if is_directory { self.max_depth.saturating_sub(1) } else { 1 };
+            let max_depth = if is_directory {
+                self.max_depth.saturating_sub(1)
+            } else {
+                1
+            };
             let analyzer = DiskAnalyzer::new(max_depth);
-            
+
             let handle = task::spawn_blocking(move || {
                 let size = analyzer.calculate_size(&path_clone).unwrap_or(0);
                 DirectoryEntry::new(path_clone, size, is_directory)

@@ -113,9 +113,10 @@ impl FileManager {
                     .file_name()
                     .map(|n| n.to_string_lossy())
                     .unwrap_or_else(|| entry.path.to_string_lossy());
-                format!("{:>width_size$} {:>width_type$} {}", 
-                    entry.size_human, 
-                    file_type, 
+                format!(
+                    "{:>width_size$} {:>width_type$} {}",
+                    entry.size_human,
+                    file_type,
                     name,
                     width_size = SIZE_COLUMN_WIDTH,
                     width_type = TYPE_COLUMN_WIDTH
@@ -240,8 +241,9 @@ impl FileManager {
 
         println!("\n📊 Directory Contents (sorted by size):");
         println!("{:-<width$}", "", width = TABLE_WIDTH);
-        println!("{:>width_size$} {:>width_type$} NAME", 
-            "SIZE", 
+        println!(
+            "{:>width_size$} {:>width_type$} NAME",
+            "SIZE",
             "TYPE",
             width_size = SIZE_COLUMN_WIDTH,
             width_type = TYPE_COLUMN_WIDTH
@@ -255,9 +257,10 @@ impl FileManager {
                 .file_name()
                 .map(|n| n.to_string_lossy())
                 .unwrap_or_else(|| entry.path.to_string_lossy());
-            println!("{:>width_size$} {:>width_type$} {}", 
-                entry.size_human, 
-                file_type, 
+            println!(
+                "{:>width_size$} {:>width_type$} {}",
+                entry.size_human,
+                file_type,
                 name,
                 width_size = SIZE_COLUMN_WIDTH,
                 width_type = TYPE_COLUMN_WIDTH
@@ -267,8 +270,9 @@ impl FileManager {
         let total_size: u64 = entries.iter().map(|e| e.size_bytes).sum();
         let total_human = humansize::format_size(total_size, humansize::DECIMAL);
         println!("{:-<width$}", "", width = TABLE_WIDTH);
-        println!("{:>width_size$} {:>width_type$} TOTAL", 
-            total_human, 
+        println!(
+            "{:>width_size$} {:>width_type$} TOTAL",
+            total_human,
             "",
             width_size = SIZE_COLUMN_WIDTH,
             width_type = TYPE_COLUMN_WIDTH

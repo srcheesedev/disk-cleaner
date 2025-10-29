@@ -288,10 +288,10 @@ mod tests {
     #[test]
     fn test_cli_conflicting_flags_prevented() {
         use clap::error::ErrorKind;
-        
+
         // This should fail now with the group constraint
         let result = Cli::try_parse_from(["disk-cleaner", "--dirs-only", "--files-only"]);
-        
+
         assert!(result.is_err());
         if let Err(err) = result {
             assert_eq!(err.kind(), ErrorKind::ArgumentConflict);

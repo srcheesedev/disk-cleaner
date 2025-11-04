@@ -100,18 +100,152 @@ runs:
           fi
         done
         
-        # For now, only create basic binary archives
-        # TODO: Implement full package creation (DEB, RPM, PKG, MSI)
-        echo "📦 Creating binary archive..."
+        # Create packages based on package-type
+        echo "📦 Creating package type: ${{ inputs.package-type }}"
         ARTIFACT_NAME="${{ inputs.project-name }}-${{ inputs.platform }}"
         
-        if [[ "${{ runner.os }}" == "Windows" ]]; then
-          cd dist && 7z a "../packages/${ARTIFACT_NAME}.zip" *
-          ARTIFACT_PATH="packages/${ARTIFACT_NAME}.zip"
-        else
-          cd dist && tar -czf "../packages/${ARTIFACT_NAME}.tar.gz" *
-          ARTIFACT_PATH="packages/${ARTIFACT_NAME}.tar.gz"
-        fi
+        case "${{ inputs.package-type }}" in
+          "binary")
+            # Basic binary archives
+            if [[ "${{ runner.os }}" == "Windows" ]]; then
+              cd dist && 7z a "../packages/${ARTIFACT_NAME}.zip" *
+              ARTIFACT_PATH="packages/${ARTIFACT_NAME}.zip"
+            else
+              cd dist && tar -czf "../packages/${ARTIFACT_NAME}.tar.gz" *
+              ARTIFACT_PATH="packages/${ARTIFACT_NAME}.tar.gz"
+            fi
+            ;;
+            
+          "deb")
+            # Create Debian package
+            echo "🐧 Creating DEB package..."
+            PACKAGE_NAME="disk-cleaner"
+            VERSION="${{ inputs.version }}"
+            DEB_DIR="packages/deb"
+            
+            mkdir -p "$DEB_DIR/DEBIAN"
+            mkdir -p "$DEB_DIR/usr/local/bin"
+            mkdir -p "$DEB_DIR/usr/share/doc/$PACKAGE_NAME"
+            
+            # Copy binary
+            cp "dist/$BINARY_NAME" "$DEB_DIR/usr/local/bin/disk-cleaner"
+            chmod +x "$DEB_DIR/usr/local/bin/disk-cleaner"
+            
+            # Copy documentation
+            cp dist/README.md "$DEB_DIR/usr/share/doc/$PACKAGE_NAME/" 2>/dev/null || true
+            cp dist/LICENSE "$DEB_DIR/usr/share/doc/$PACKAGE_NAME/" 2>/dev/null || true
+            
+            # Create control file
+            cat > "$DEB_DIR/DEBIAN/control" << EOF
+            Package: $PACKAGE_NAME
+            Version: $VERSION
+            Section: utils
+            Priority: optional
+            Architecture: amd64
+            Maintainer: srcheesedev <noreply@github.com>
+            Description: Lightning-fast disk space analyzer and cleanup tool
+             A high-performance cross-platform disk analyzer and cleaner built with Rust.
+             Provides fast directory scanning, file analysis, and safe cleanup operations.
+            EOF
+            
+            # Build DEB package
+            dpkg-deb --build "$DEB_DIR" "packages/${PACKAGE_NAME}_${VERSION}_amd64.deb"
+            ARTIFACT_PATH="packages/${PACKAGE_NAME}_${VERSION}_amd64.deb"
+            ;;
+            
+          "rpm")
+            # Create RPM package
+            echo "📦 Creating RPM package..."
+            PACKAGE_NAME="disk-cleaner"
+            VERSION="${{ inputs.version }}"
+            
+            # Install rpmbuild if not available
+            if ! command -v rpmbuild &> /dev/null; then
+              sudo apt-get update
+              sudo apt-get install -y rpm
+            fi
+            
+            # Create RPM structure
+            RPM_ROOT="packages/rpm"
+            mkdir -p "$RPM_ROOT"/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
+            mkdir -p "$RPM_ROOT/BUILD/usr/local/bin"
+            mkdir -p "$RPM_ROOT/BUILD/usr/share/doc/$PACKAGE_NAME"
+            
+            # Copy files
+            cp "dist/$BINARY_NAME" "$RPM_ROOT/BUILD/usr/local/bin/disk-cleaner"
+            chmod +x "$RPM_ROOT/BUILD/usr/local/bin/disk-cleaner"
+            cp dist/README.md "$RPM_ROOT/BUILD/usr/share/doc/$PACKAGE_NAME/" 2>/dev/null || true
+            cp dist/LICENSE "$RPM_ROOT/BUILD/usr/share/doc/$PACKAGE_NAME/" 2>/dev/null || true
+            
+            # Create spec file
+            cat > "$RPM_ROOT/SPECS/$PACKAGE_NAME.spec" << EOF
+            Name: $PACKAGE_NAME
+            Version: $VERSION
+            Release: 1
+            Summary: Lightning-fast disk space analyzer and cleanup tool
+            License: MIT
+            Group: Applications/System
+            BuildArch: x86_64
+            
+            %description
+            A high-performance cross-platform disk analyzer and cleaner built with Rust.
+            Provides fast directory scanning, file analysis, and safe cleanup operations.
+            
+            %files
+            /usr/local/bin/disk-cleaner
+            /usr/share/doc/$PACKAGE_NAME/README.md
+            /usr/share/doc/$PACKAGE_NAME/LICENSE
+            
+            %changelog
+            * $(date '+%a %b %d %Y') srcheesedev <noreply@github.com> - $VERSION-1
+            - Release $VERSION
+            EOF
+            
+            # Build RPM
+            cd "$RPM_ROOT"
+            rpmbuild --define "_topdir $(pwd)" --define "_rpmdir $(pwd)/RPMS" -bb "SPECS/$PACKAGE_NAME.spec"
+            cp "RPMS/x86_64/$PACKAGE_NAME-$VERSION-1.x86_64.rpm" "../$PACKAGE_NAME-$VERSION-1.x86_64.rpm"
+            cd ../..
+            ARTIFACT_PATH="packages/$PACKAGE_NAME-$VERSION-1.x86_64.rpm"
+            ;;
+            
+          "pkg")
+            # Create macOS PKG
+            echo "🍎 Creating PKG package..."
+            PACKAGE_NAME="disk-cleaner"
+            VERSION="${{ inputs.version }}"
+            PKG_ROOT="packages/pkg"
+            
+            mkdir -p "$PKG_ROOT/usr/local/bin"
+            cp "dist/$BINARY_NAME" "$PKG_ROOT/usr/local/bin/disk-cleaner"
+            chmod +x "$PKG_ROOT/usr/local/bin/disk-cleaner"
+            
+            # Build PKG
+            pkgbuild --root "$PKG_ROOT" \
+                     --identifier "com.srcheesedev.disk-cleaner" \
+                     --version "$VERSION" \
+                     "packages/$PACKAGE_NAME-macos-v$VERSION.pkg"
+            ARTIFACT_PATH="packages/$PACKAGE_NAME-macos-v$VERSION.pkg"
+            ;;
+            
+          "msi")
+            # Create Windows MSI
+            echo "🪟 Creating MSI package..."
+            PACKAGE_NAME="disk-cleaner"
+            VERSION="${{ inputs.version }}"
+            
+            # For now, create a ZIP as MSI creation requires WiX toolset
+            # TODO: Implement proper MSI creation with WiX
+            cd dist && 7z a "../packages/$PACKAGE_NAME-windows-v$VERSION.zip" *
+            ARTIFACT_PATH="packages/$PACKAGE_NAME-windows-v$VERSION.zip"
+            echo "⚠️  MSI creation not yet implemented, created ZIP instead"
+            ;;
+            
+          *)
+            echo "❌ Unknown package type: ${{ inputs.package-type }}"
+            exit 1
+            ;;
+        esac
         
         echo "📦 Created package: $ARTIFACT_PATH"
         
